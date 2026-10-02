@@ -317,6 +317,39 @@ func TestResetAwareCooldownAndReadmission(t *testing.T) {
 	}
 }
 
+func TestResetAwareSingletonTelemetryPolicy(t *testing.T) {
+	for _, state := range []string{"missing", "stale", "missing-reset", "missing-model-window"} {
+		for _, policy := range []string{"exclude", "fallback"} {
+			t.Run(state+"/"+policy, func(t *testing.T) {
+				selector := resetAwareFixtureSelector(&RoundRobinSelector{})
+				selector.config.StaleTelemetryPolicy = policy
+				auth := resetAwareFixtureAuth("only", "codex")
+				if state != "missing" {
+					window := resetAwareFixtureWindow("weekly", 80, resetAwareFixtureNow.Add(time.Hour), 7*24*time.Hour)
+					switch state {
+					case "stale":
+						window.ObservedAt = resetAwareFixtureNow.Add(-2 * time.Hour)
+						auth.Quota.ObservedAt = window.ObservedAt
+					case "missing-reset":
+						window.ResetAt = time.Time{}
+					case "missing-model-window":
+						window.Provider = "claude"
+					}
+					auth.Quota.Windows = []QuotaWindow{window}
+				}
+				picked, err := selector.Pick(context.Background(), "codex", "sol", cliproxyexecutor.Options{}, []*Auth{auth})
+				if policy == "exclude" {
+					if err == nil || picked != nil {
+						t.Fatalf("exclude selected incomplete singleton: picked=%v err=%v", picked, err)
+					}
+				} else if err != nil || picked == nil || picked.ID != auth.ID {
+					t.Fatalf("fallback failed: picked=%v err=%v", picked, err)
+				}
+			})
+		}
+	}
+}
+
 func TestResetAwareResetDueRequiresFreshTelemetryWhenConfiguredToExclude(t *testing.T) {
 	selector := resetAwareFixtureSelector(&RoundRobinSelector{})
 	selector.config.StaleTelemetryPolicy = "exclude"

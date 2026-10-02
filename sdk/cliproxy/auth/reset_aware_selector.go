@@ -482,12 +482,13 @@ func (s *ResetAwareSelector) planLocked(provider, model string, auths []*Auth, n
 		return plan
 	}
 	if len(plan.assessments) == 1 {
-		// A single eligible credential is direct-use; there is no scoring or
-		// telemetry assumption to make for the one-candidate case.
+		// A single credential needs no ranking, but still obeys the configured
+		// telemetry policy before it can be used directly.
 		candidate := plan.assessments[0]
 		candidate.normal = candidate.normalEligible
 		candidate.reserve = candidate.reserveEligible && !candidate.normalEligible
-		if !candidate.blocked && (candidate.normalEligible || candidate.reserveEligible || (!candidate.telemetryFresh && candidate.telemetryState != "reset-due-refresh")) {
+		allowTelemetryFallback := !candidate.telemetryFresh && candidate.telemetryState != "reset-due-refresh" && strings.EqualFold(s.config.StaleTelemetryPolicy, "fallback")
+		if !candidate.blocked && (candidate.normalEligible || candidate.reserveEligible || allowTelemetryFallback) {
 			plan.selected = candidate.auth
 			return plan
 		}
