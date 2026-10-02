@@ -109,7 +109,7 @@ The preservation task inventoried `%LOCALAPPDATA%/CLIProxyAPI/`, its `.local/` c
 | Current and historical fleet inventory, stdout/stderr logs, backups | B/E: private operational metadata/evidence | Preserved locally; not committed |
 | Reconciliation executables, partial backup source trees, debug/temporary output | E/F: evidence/debugging | Preserved locally; not treated as reusable ops source |
 
-Do not copy `~/.cli-proxy-api/*`, real provider auth files, Tailscale auth state, SSH private keys, management keys, `.env`, or local secret-bearing config into this repository. `.gitignore` protects common local runtime/key/inventory paths while retaining source examples. The scoped scanner checks literal credential patterns and private-key material and prints only file/line/rule identifiers. It is defense in depth, not proof that every possible secret format is detectable; manually review staged files as well. The offline CI workflow needs no machines, accounts, keys, or inference.
+Do not copy `~/.cli-proxy-api/*`, real provider auth files, Tailscale auth state, SSH private keys, management keys, `.env`, or local secret-bearing config into this repository. `.gitignore` protects common local runtime/key/inventory paths while retaining source examples. The scoped scanner checks literal credential patterns and private-key material and prints only file/line/rule identifiers. It is defense in depth, not proof that every possible secret format is detectable; manually review staged files as well. The repo-local verifier needs no machines, accounts, keys, or inference.
 
 ## Safely update this fork
 
@@ -131,3 +131,76 @@ python -m unittest discover -s tests/fleet -v
 pwsh -NoProfile -File tests/fleet/test-powershell-launchers.ps1
 python ops/havok-fleet/check-secret-safety.py
 ```
+
+## Verify locally before pushing
+
+Havok verification intentionally does not require GitHub Actions, paid minutes, a billing unlock, Docker, or external CI. GitHub is source control. All normal verification runs locally on Windows 11 and Ubuntu-24.04 in WSL. Production smoke testing remains a separate operator activity; this verifier has no live-smoke or inference switch.
+
+Requirements: Windows Python 3.11+, PowerShell 7.4+ (`pwsh`), Git, Go 1.26+ (PATH or `C:\Program Files\Go\bin\go.exe`), and WSL distro `Ubuntu-24.04` with Python 3.11+, Git and POSIX `sh`. Linux Go is not required: Go verification runs on Windows; Linux verifies the fleet and launchers. Dependencies must already be in the Go module cache. On a fresh clone, provision the Go toolchain and populate dependencies once with `go mod download` before offline verification. This setup may download public modules; normal CI sets `GOPROXY=off`, `GOSUMDB=off`, `GOTOOLCHAIN=local` and `-mod=readonly`, and does not fetch catalogs or install software.
+
+HOW TO VERIFY BEFORE PUSH:
+
+```powershell
+.\tools\havok-ci.ps1
+# Also works through Windows PowerShell 5.1:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\havok-ci.ps1
+```
+
+FAST:
+
+```powershell
+.\tools\havok-ci.ps1 -Fast
+```
+
+Default and Fast run the same push gate: fork/remote and whitespace safety, working-source and staged-index secret scans, PowerShell parsing, fake-runtime launcher and fleet dry-run tests, Python fleet and CI self-tests, reset-aware/quota tests, focused Go packages, a server build, and WSL/Linux verification. Fresh Go test execution uses `-count=1 -p 1`. Warm-cache runs are substantially faster than the first compile.
+
+FULL:
+
+```powershell
+.\tools\havok-ci.ps1 -Full
+```
+
+Full adds `go test -count=1 -p 1 ./...`. It exercises every local Go package, including executor, translator, thinking and integration tests. Tests use fixtures, mocks, temporary directories and local HTTP test servers; the verifier never invokes fleet installation, OAuth, live launchers, machine-key generation, Tailscale, Herdr, model inference or service restarts. The A=27% earlier weekly reset, B=52% later weekly reset, C=normal-exhausted reserve fixture remains A → B → C reserve. Sticky sessions, reserve-last, manual-reset exclusion, stale telemetry, cooldown, concurrent cold placement and quota refresh run through the existing auth tests.
+
+`-NoBuild` and `-NoWSL` are explicit diagnostic exclusions. They produce `RESULT: INCOMPLETE`, `complete: false` and exit code 2; use a complete run before pushing. `-JsonReport` prints the structured report as well as writing it. `-InstallHook` installs push protection and then runs verification. Fast and Full are mutually exclusive. Ordinary verification allows a dirty tree and records its state; it never stages or changes source files.
+
+Go build cache defaults to `.local-ci/go-cache` on the repository drive (E: here). Windows test and compiler temporary files use an NTFS directory with at least 2 GiB free: current TEMP first, then `O:\Temp` when available. Set `HAVOK_CI_TEMP` to choose another existing NTFS directory. E: is exFAT on this host; NTFS fixtures are necessary for old timestamps, Git packfiles and timely atomic file operations. C: is not used when an eligible non-C: temporary directory is selected. Existing Go module cache is reused, with downloads disabled; the verifier does not grow the C: module cache. Build output is retained with the report and is never deployed. Results accumulate under `.local-ci/results/<UTC timestamp>/`: `summary.json`, `summary.md`, `windows.log`, `linux.log`, `go-tests.log`, `build.log` and `source-manifest.json`. Native test/compiler temporary files are cleaned after each run. The JSON includes UTC timestamp, SHA, branch, dirty state, mode, OS, WSL distro, checks, commands, exit codes, durations, exclusions, native temporary path, source digest and final result. Linux permission fixtures use Ubuntu-native `/tmp` and are cleaned after the run; logs remain on E:. WSL produces its own timestamped report directory; the Windows `linux.log` records its path and result. `.local-ci/` is gitignored. Remove old results/cache explicitly when no verifier is running; nothing prunes evidence automatically.
+
+Commands and short failure locations appear in the terminal; detailed output stays in logs. Credential-shaped log lines are redacted, and the scanner only prints path/line/rule, never matching secret text. The scanner covers fleet/launcher/CI source plus staged text content (including source outside those directories), credential JSON fields, bearer tokens, API/OAuth/management/machine keys and private-key markers. Explicit `test-only-` and `unit-test-` fixture values and environment references are allowed. Forcibly staged credential/generated directories are rejected. Review staged changes manually as well; pattern scanning cannot recognize every secret.
+
+Run Linux checks independently:
+
+```powershell
+wsl -d Ubuntu-24.04 --exec bash -c 'cd /mnt/e/CLIProxyAPI && sh tools/havok-ci-linux.sh'
+```
+
+The Windows runner translates its actual path using `wslpath` and passes it as one positional shell argument. Linux runs Python fleet/self-tests (including executable fake Pi/Claude/Codex runtimes and protected POSIX permissions), staged/source secret scanning, POSIX syntax, LF checks, and bootstrap Python compilation. Missing WSL fails the normal gate; skipping it requires `-NoWSL`.
+
+INSTALL PUSH PROTECTION:
+
+```powershell
+.\tools\install-git-hooks.ps1
+# Remove only this installation:
+.\tools\uninstall-git-hooks.ps1
+```
+
+The installer sets repository-local `core.hooksPath=tools/git-hooks`, recording prior state in Git's private metadata. It refuses to replace or bypass an existing pre-push hook or configured hooksPath; combine existing hooks explicitly if needed. It changes no global Git configuration. Uninstall restores the recorded prior setting and refuses if another tool changed hooksPath since installation. The hook runs the Windows entry point with `-Fast`; any nonzero exit blocks the push. It also rejects every push destination except `Havokyn/CLIProxyAPI`, including upstream. Both entry points and the hook work offline with respect to production. Git hooks are local and can be bypassed with Git's own options; they are an operator guard, not server enforcement.
+
+`origin` fetch and push URLs must point to `Havokyn/CLIProxyAPI`. If you configure `upstream`, disable its push URL explicitly:
+
+```powershell
+git remote set-url --push upstream DISABLED
+```
+
+Fetching upstream remains allowed, but verification never fetches automatically. The CI uses exact-path, process-scoped `safe.directory` allowances for E:; it does not set global trust.
+
+### Workflow replacement and self-verification
+
+Removed Havok workflow: `.github/workflows/havok-fleet.yml`. Its five verification steps (Python fleet unittest, secret scanner, PowerShell parsing/launcher/dry runs, POSIX syntax, diff check) all run locally. Windows/WSL checks, Go routing/focused tests, server build, full Go suite, reports, hook protection and failure tests add coverage.
+
+Six upstream-owned workflows are preserved unchanged: `agents-md-guard.yml` (AGENTS policy), `auto-retarget-main-pr-to-dev.yml` (PR retargeting), `pr-path-guard.yml` (translator policy), `pr-test-build.yml` (catalog refresh/build), `docker-image.yml` (tagged Docker publishing), and `release.yaml` (tagged release publishing). They are not requirements for any Havok verification or local push gate. Catalog refresh and release publishing are online upstream operations and are deliberately outside offline verification.
+
+CI self-tests exercise a temporary command exiting 23 (report FAIL and nonzero), a synthetic staged credential hidden by a harmless working copy, secret-free failure diagnostics, hook destination rejection, Linux hook Fast invocation/pass/fail propagation through actual Git hook discovery using a fake PowerShell, and Windows temporary-repository install/uninstall/existing-hook refusal. They never push a real remote or alter the working repository to manufacture failure.
+
+
+Go runs against `.local-ci/source`, an isolated mirror of tracked and nonignored working files, including unstaged changes and new nonignored source. This avoids Go recursively discovering incomplete historical backups under ignored `bin/`. Original backups and runtime files are preserved. A file-hash manifest binds the snapshot to the report; only generated files recorded in the manifest are updated/removed. Unexpected snapshot files, symlinks, Windows junctions or reparse points fail closed. A repo-local `source.lock` prevents simultaneous Go runs from rewriting the mirror. If a verifier is interrupted, inspect its process and preserve its report before removing a stale lock. Local compile artifacts use `-buildvcs=false` because the source mirror is not a Git checkout; the JSON SHA and source manifest provide provenance. These artifacts are verification outputs, not deployment releases.

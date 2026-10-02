@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -596,6 +597,9 @@ func TestDeletePluginRemovesDiscoveredFileAndConfig(t *testing.T) {
 	reloads := make(chan *config.Config, 1)
 	releaseReload := make(chan struct{})
 	reloadDone := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseReload) }) }
+	t.Cleanup(release)
 	h.SetConfigReloadHook(func(_ context.Context, cfg *config.Config) {
 		defer close(reloadDone)
 		reloads <- cfg
@@ -621,9 +625,16 @@ func TestDeletePluginRemovesDiscoveredFileAndConfig(t *testing.T) {
 		close(done)
 	}()
 
+	// Separate disk work from the assertion that reload cannot block the handler.
+	var cfgSnapshot *config.Config
+	select {
+	case cfgSnapshot = <-reloads:
+	case <-time.After(10 * time.Second):
+		t.Fatal("timed out waiting for config reload to start")
+	}
 	select {
 	case <-done:
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second):
 		t.Fatal("DeletePlugin blocked waiting for config reload")
 	}
 
@@ -650,18 +661,17 @@ func TestDeletePluginRemovesDiscoveredFileAndConfig(t *testing.T) {
 	if _, errStat := os.Stat(path); !os.IsNotExist(errStat) {
 		t.Fatalf("plugin file stat error = %v, want not exist", errStat)
 	}
-	cfgSnapshot := waitForAsyncReload(t, reloads)
 	if cfgSnapshot == h.cfg {
-		close(releaseReload)
+		release()
 		waitForReloadDone(t, reloadDone)
 		t.Fatalf("reload config = handler config %p, want independent snapshot", h.cfg)
 	}
 	if _, ok := cfgSnapshot.Plugins.Configs["sample"]; ok {
-		close(releaseReload)
+		release()
 		waitForReloadDone(t, reloadDone)
 		t.Fatal("snapshot plugin config still exists after delete")
 	}
-	close(releaseReload)
+	release()
 	waitForReloadDone(t, reloadDone)
 }
 

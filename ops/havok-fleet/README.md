@@ -34,3 +34,13 @@ git diff --check
 ```
 
 The SSH payload contains reusable source and nonsecret settings only. Keys are read on the destination. Errors suppress remote stderr, response bodies, and credential source contents. A missing or improperly protected key stops onboarding before configuration changes. Configuration writes are atomic per file, unchanged content is skipped, and caught installation failures roll back completed file writes. A host crash still requires inspection and a rerun; this is not a distributed transaction or service manager.
+
+Use the complete repository-local Windows/WSL push gate:
+
+```powershell
+.\tools\havok-ci.ps1 -Fast
+.\tools\havok-ci.ps1 -Full
+.\tools\install-git-hooks.ps1
+```
+
+See the [local verification guide](../../docs/havok-fleet.md#verify-locally-before-pushing). Havok verification intentionally does not require GitHub Actions or billing-dependent CI.

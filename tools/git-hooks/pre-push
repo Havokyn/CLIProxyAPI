@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+# Git passes the remote name and URL. Reject any destination other than this fork.
+destination=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+case "$destination" in
+  https://github.com/havokyn/cliproxyapi|https://github.com/havokyn/cliproxyapi.git|git@github.com:havokyn/cliproxyapi|git@github.com:havokyn/cliproxyapi.git|ssh://git@github.com/havokyn/cliproxyapi|ssh://git@github.com/havokyn/cliproxyapi.git) ;;
+  *) echo 'Havok pre-push: destination is not Havokyn/CLIProxyAPI; push blocked.' >&2; exit 1 ;;
+esac
+if command -v powershell.exe >/dev/null 2>&1; then
+  runner=powershell.exe
+elif command -v pwsh >/dev/null 2>&1; then
+  runner=pwsh
+else
+  echo 'Havok pre-push: Windows PowerShell is required; push blocked.' >&2
+  exit 1
+fi
+cd -- "$root"
+"$runner" -NoProfile -ExecutionPolicy Bypass -File ./tools/havok-ci.ps1 -Fast

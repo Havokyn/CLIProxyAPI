@@ -4,3 +4,7 @@ ops/havok-fleet/*.py text eol=lf
 ops/havok-fleet/*.ps1 text eol=lf
 scripts/launchers/windows/*.ps1 text eol=lf
 tests/fleet/* text eol=lf
+
+tools/* text eol=lf
+tools/git-hooks/* text eol=lf
+tests/local_ci/* text eol=lf

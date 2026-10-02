@@ -86,3 +86,6 @@ fleet.local.json
 fleet-inventory.json
 havok-fleet-inventory*.json
 __pycache__/
+
+# Generated local verification results, build outputs and caches
+.local-ci/

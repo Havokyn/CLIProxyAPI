@@ -94,6 +94,25 @@ INVENTORY_SCHEMA = {
 
 
 class RemoteAgentTests(unittest.TestCase):
+    def test_endpoint_validation_rejects_credentials_paths_and_non_https(self):
+        agent.validate_endpoint("https://proxy.invalid:443")
+        for endpoint in ("http://proxy.invalid", "https://user:password@proxy.invalid",
+                         "https://proxy.invalid/v1", "https://proxy.invalid?key=value",
+                         "https://proxy.invalid:99999", "https://proxy.invalid#fragment"):
+            with self.subTest(endpoint=endpoint), self.assertRaises(ValueError):
+                agent.validate_endpoint(endpoint)
+
+    @mock.patch.object(peer.platform, "system", return_value="Linux")
+    @mock.patch.object(peer.shutil, "which", return_value="/fake/tailscale")
+    @mock.patch.object(peer, "run")
+    def test_peer_bootstrap_never_enables_funnel_or_serve(self, run, _which, _system):
+        run.return_value = types.SimpleNamespace(returncode=0, stdout=json.dumps({
+            "BackendState": "Running", "Self": {"Online": True}}), stderr="")
+        self.assertTrue(peer.onboard("fixture-peer")["online"])
+        for call in run.call_args_list:
+            self.assertNotIn("funnel", call.args[0])
+            self.assertNotIn("serve", call.args[0])
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.home = Path(self.temporary.name)

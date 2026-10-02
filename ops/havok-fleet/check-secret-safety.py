@@ -9,6 +9,8 @@ import math
 from pathlib import Path
 import re
 import sys
+import argparse
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 SCOPED = (
@@ -16,13 +18,15 @@ SCOPED = (
     "scripts/launchers",
     "docs/havok-fleet.md",
     "tests/fleet",
+    "tools",
+    "tests/local_ci",
 )
-TEXT_SUFFIXES = {".md", ".py", ".ps1", ".psm1", ".sh", ".json", ".toml", ".yaml", ".yml", ".txt"}
-EXTENSIONLESS_LAUNCHERS = {"pi-cliproxy", "claude-cliproxy", "codex-cliproxy"}
+TEXT_SUFFIXES = {".md", ".py", ".ps1", ".psm1", ".sh", ".json", ".toml", ".yaml", ".yml", ".txt", ".go", ".env"}
+EXTENSIONLESS_LAUNCHERS = {"pi-cliproxy", "claude-cliproxy", "codex-cliproxy", "pre-push"}
 BEARER = re.compile(r"\bBearer\s+([A-Za-z0-9._~+/=-]{16,})", re.IGNORECASE)
 ASSIGNMENT = re.compile(
     r"(?i)(?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|"
-    r"auth[_-]?token|id[_-]?token|password|secret)\s*[\"']?\s*[:=]\s*[\"']?"
+    r"auth[_-]?token|id[_-]?token|management[_-]?key|machine[_-]?(?:key|credentials?)|password|secret[_-]?key|secret)\s*[\"']?\s*[:=]\s*[\"']?"
     r"([^\s\"',;}]+)"
 )
 OAUTH_JSON = re.compile(
@@ -34,11 +38,14 @@ PLACEHOLDERS = {
     "redacted", "example", "dummy", "null", "none", "false",
 }
 PRIVATE_KEY = re.compile(r"-{5}BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-{5}")
+TOKEN_LITERAL = re.compile(r"\b(?:sk-(?:proj-)?[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|ya29\.[A-Za-z0-9_-]{20,}|eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,})\b")
 
 
 def looks_like_secret(value: str, literal: bool = False) -> bool:
     value = value.strip().strip("<>").strip()
     if not value or value.lower() in PLACEHOLDERS or value.startswith(("${", "$env:", "<")):
+        return False
+    if value.lower().startswith(("test-only-", "unit-test-")):
         return False
     if any(marker in value for marker in ("$", "{{", "}}", "(", ")", "[", "]")):
         return False
@@ -65,6 +72,9 @@ def scan_text(text: str) -> list[tuple[int, str]]:
     for line_number, line in enumerate(text.splitlines(), 1):
         if PRIVATE_KEY.search(line):
             findings.append((line_number, "private-key"))
+            continue
+        if TOKEN_LITERAL.search(line):
+            findings.append((line_number, "token-literal"))
             continue
         for rule, pattern in (("bearer", BEARER), ("credential-assignment", ASSIGNMENT), ("oauth-json", OAUTH_JSON)):
             if any(
@@ -98,14 +108,48 @@ def scan(root: Path = ROOT) -> list[tuple[str, int, str]]:
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
-            continue
+            raise OSError(f"Cannot read scoped source file: {path.relative_to(root).as_posix()}") from None
         for line, rule in scan_text(content):
             results.append((path.relative_to(root).as_posix(), line, rule))
     return results
 
 
+def staged_findings(root: Path) -> list[tuple[str, int, str]]:
+    """Scan index contents, including ignored credentials forcibly staged by mistake."""
+    command = ["git", "-c", f"safe.directory={root.as_posix()}", "-C", str(root)]
+    paths = subprocess.run(command + ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
+                           capture_output=True, check=True).stdout.decode("utf-8").split("\0")
+    results = []
+    for relative in filter(None, paths):
+        path = Path(relative)
+        if path.name in {"credentials.json", "client.key", "management.key", "id_rsa", "id_ed25519", ".env", "config.yaml"} or path.name.startswith(".env.") or path.name.endswith(".private.key") or any(
+                part in {"auths", "machine-keys", ".local", ".local-ci"} for part in path.parts):
+            results.append((relative, 1, "credential-or-generated-file-staged"))
+            continue
+        raw = subprocess.run(command + ["show", ":" + relative], capture_output=True, check=True).stdout
+        content = raw.decode("utf-8", errors="replace")
+        if b"\0" in raw and not PRIVATE_KEY.search(content):
+            continue  # Binary assets; text/index files are scanned regardless of extension.
+        results.extend((relative, line, rule) for line, rule in scan_text(content))
+    return results
+
+
 def main() -> int:
-    findings = scan()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--staged", action="store_true", help="Also inspect staged index content")
+    parser.add_argument("--root", type=Path, default=ROOT, help="Isolated fixture/repository root")
+    options = parser.parse_args()
+    try:
+        findings = scan(options.root)
+    except OSError as error:
+        print(str(error))
+        return 1
+    if options.staged:
+        try:
+            findings += staged_findings(options.root)
+        except (OSError, subprocess.CalledProcessError):
+            print("Secret safety: could not inspect staged index; failing closed.")
+            return 1
     if findings:
         for path, line, rule in findings:
             print(f"{path}:{line}: possible literal credential ({rule})")
