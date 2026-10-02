@@ -21,6 +21,32 @@ func TestWeightedRoundRobinRoutingSelector(t *testing.T) {
 	}
 }
 
+func TestResetAwareRoutingSelectorUsesConfiguredFallbackAndAffinity(t *testing.T) {
+	preserve := true
+	cfg := &internalconfig.Config{Routing: internalconfig.RoutingConfig{
+		Strategy: "reset-aware",
+		ResetAware: internalconfig.ResetAwareRoutingConfig{
+			PreserveSessionAffinity: &preserve,
+			FallbackStrategy:        "fill-first",
+		},
+	}}
+	state := normalizedRoutingRuntimeState(cfg)
+	if state.strategy != "reset-aware" || !state.sessionAffinity {
+		t.Fatalf("reset-aware runtime state = %+v", state)
+	}
+	selector := newRoutingSelector(state)
+	affinity, ok := selector.(*coreauth.SessionAffinitySelector)
+	if !ok {
+		t.Fatalf("selector type = %T, want session affinity wrapper", selector)
+	}
+	if _, ok := affinity.LookupAffinity("codex", "sol", "missing"); ok != "unbound" {
+		t.Fatalf("unexpected affinity lookup status = %q", ok)
+	}
+	if coreauth.ResetAwareSelectorFrom(selector) == nil {
+		t.Fatalf("reset-aware selector was not retained behind affinity wrapper")
+	}
+}
+
 func TestServiceRejectsInvalidCredentialWeightConfigCommit(t *testing.T) {
 	originalCfg := &internalconfig.Config{}
 	service := &Service{cfg: originalCfg}

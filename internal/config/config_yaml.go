@@ -384,9 +384,20 @@ func isKnownDefaultValue(path []string, node *yaml.Node) bool {
 		return false
 	}
 
-	// Pointer-backed booleans (such as cache-user-id and disable-cooling): explicit false is meaningful and must be preserved.
-	if len(path) > 0 && (path[len(path)-1] == "cache-user-id" || path[len(path)-1] == "disable-cooling") && node != nil && node.Kind == yaml.ScalarNode && node.Tag == "!!bool" {
-		return false
+	// Pointer-backed settings: explicit false or zero is meaningful and must be
+	// preserved when management saves a v8 configuration. Reset-aware floors and
+	// switches use the same omission-vs-explicit-value contract.
+	if len(path) > 0 {
+		pointerBacked := map[string]bool{
+			"cache-user-id": true, "disable-cooling": true,
+			"preserve-session-affinity": true, "longest-window-first": true,
+			"use-expiring-capacity-first": true, "min-long-window-remaining-percent": true,
+			"min-short-window-remaining-percent": true, "auto-use-manual-resets": true,
+			"refresh-after-reset": true,
+		}
+		if pointerBacked[path[len(path)-1]] && node != nil && node.Kind == yaml.ScalarNode {
+			return false
+		}
 	}
 
 	// First check if it's a zero value

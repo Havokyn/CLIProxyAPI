@@ -193,6 +193,10 @@ func TestFetchCredentialQuota_Endpoint(t *testing.T) {
 	if quotaResp.Groups[0].Buckets[0].RemainingFraction != 0.9 {
 		t.Fatalf("unexpected fraction: %f", quotaResp.Groups[0].Buckets[0].RemainingFraction)
 	}
+	updated, ok := manager.GetByID(auth.ID)
+	if !ok || updated == nil || len(updated.Quota.Windows) != 1 || updated.Quota.Windows[0].RemainingPercent != 90 {
+		t.Fatalf("normalized quota was not written to runtime state: %+v", updated)
+	}
 }
 
 func TestResetCredentialQuota_Endpoint(t *testing.T) {

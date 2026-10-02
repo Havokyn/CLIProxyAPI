@@ -32,8 +32,9 @@ func ProviderSupportsQuotaObservation(provider string) bool {
 // indefinitely. Responses that carry no quota signal at all (transport
 // failures, 5xx, unrelated endpoints) leave the previous snapshot untouched.
 //
-// This function only ever touches ObservedAt and Signals. Cooldown and
-// scheduling fields are never read or written here.
+// This function only touches observation fields (ObservedAt, Signals, and the
+// normalized Windows view). Cooldown and scheduling fields are never read or
+// written here.
 func (q *QuotaState) ObserveResponseHeadersForProvider(provider string, headers http.Header, observedAt time.Time) bool {
 	if q == nil {
 		return false
@@ -50,16 +51,18 @@ func (q *QuotaState) ObserveResponseHeadersForProvider(provider string, headers 
 	}
 	q.Signals = next
 	q.ObservedAt = observedAt
+	q.Windows = quotaWindowsFromSignals(provider, next, observedAt)
 	return true
 }
 
 // ClearObservationSignals removes only passive observation data. It leaves
 // cooldown and scheduler state untouched.
 func (q *QuotaState) ClearObservationSignals() bool {
-	if q == nil || (len(q.Signals) == 0 && q.ObservedAt.IsZero()) {
+	if q == nil || (len(q.Signals) == 0 && len(q.Windows) == 0 && q.ObservedAt.IsZero()) {
 		return false
 	}
 	q.Signals = nil
+	q.Windows = nil
 	q.ObservedAt = time.Time{}
 	return true
 }
@@ -201,6 +204,7 @@ func isQuotaSignalHeaderForProvider(provider, name string) bool {
 		"-allowed",
 		"-limit-reached",
 		"-limit-name",
+		"-normal-model-slug",
 		"-used-percent",
 		"-window-minutes",
 		"-reset-after-seconds",
@@ -223,5 +227,6 @@ func mergeQuotaObservation(target, source QuotaState) QuotaState {
 	}
 	target.ObservedAt = source.ObservedAt
 	target.Signals = source.Clone().Signals
+	target.Windows = cloneQuotaWindows(source.Windows)
 	return target
 }

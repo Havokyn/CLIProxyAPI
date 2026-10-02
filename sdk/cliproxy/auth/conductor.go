@@ -207,6 +207,10 @@ type Manager struct {
 	refreshLocks sync.Map
 	// persistLocks serializes disk persistence per auth ID and guards against out-of-order writes.
 	persistLocks sync.Map
+	// quotaProbeStates coalesces authoritative quota reads per credential and
+	// backs off failures without keeping a second quota snapshot.
+	quotaProbeStates sync.Map
+	quotaProbeSlots  chan struct{}
 }
 
 // NewManager constructs a manager with optional custom selector and hook.
@@ -229,6 +233,7 @@ func NewManager(store Store, selector Selector, hook Hook) *Manager {
 		homeSessionSelections: make(map[string]map[homeSessionSelectionKey]*HomeDispatchSelection),
 		providerOffsets:       make(map[string]int),
 		modelPoolOffsets:      make(map[string]int),
+		quotaProbeSlots:       make(chan struct{}, 2),
 	}
 	// atomic.Value requires non-nil initial value.
 	manager.runtimeConfig.Store(&internalconfig.Config{})

@@ -610,6 +610,13 @@ func highestPriorityAuths(auths []*Auth) []*Auth {
 	return highest
 }
 
+func sessionFallbackAuths(selector Selector, auths []*Auth) []*Auth {
+	if selectorUsesAllPriorityTiers(selector) {
+		return auths
+	}
+	return highestPriorityAuths(auths)
+}
+
 // Pick selects the next available auth for the provider in a round-robin manner.
 func (s *RoundRobinSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
 	_ = opts
@@ -1019,7 +1026,13 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 		availabilityCandidates = positiveWeightAuths(auths)
 	}
 	if primaryID == "" {
-		fallbackAuths, errAvailable := getSelectorAvailableAuths(ctx, availabilityCandidates, provider, model, now)
+		var fallbackAuths []*Auth
+		var errAvailable error
+		if selectorUsesAllPriorityTiers(s.fallback) {
+			fallbackAuths, errAvailable = getSelectorAvailableAuthsAcrossPriorities(ctx, availabilityCandidates, provider, model, now)
+		} else {
+			fallbackAuths, errAvailable = getSelectorAvailableAuths(ctx, availabilityCandidates, provider, model, now)
+		}
 		if errAvailable != nil {
 			return nil, errAvailable
 		}
@@ -1033,7 +1046,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	if err != nil {
 		return nil, err
 	}
-	fallbackAuths := highestPriorityAuths(available)
+	fallbackAuths := sessionFallbackAuths(s.fallback, available)
 
 	modelKey := canonicalModelKey(model)
 	cacheKey := provider + "::" + primaryID + "::" + modelKey
@@ -1186,7 +1199,7 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 		}
 	}
 
-	fallbackAuths := highestPriorityAuths(available)
+	fallbackAuths := sessionFallbackAuths(s.fallback, available)
 	auth, errPick := s.fallback.Pick(ctx, provider, model, opts, fallbackAuths)
 	if errPick != nil {
 		return nil, true, errPick
@@ -1456,7 +1469,13 @@ func (s *SessionAffinitySelector) LookupAffinity(provider, model, sessionID stri
 
 // OnResult handles session affinity binding or release based on execution outcome.
 func (s *SessionAffinitySelector) OnResult(res Result) {
-	if s == nil || res.AuthID == "" {
+	if s == nil {
+		return
+	}
+	if fallback, ok := s.fallback.(interface{ OnResult(Result) }); ok && fallback != nil {
+		defer fallback.OnResult(res)
+	}
+	if res.AuthID == "" {
 		return
 	}
 

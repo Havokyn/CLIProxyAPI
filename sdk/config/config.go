@@ -9,6 +9,8 @@ import internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 type SDKConfig = internalconfig.SDKConfig
 
 type Config = internalconfig.Config
+type RoutingConfig = internalconfig.RoutingConfig
+type ResetAwareRoutingConfig = internalconfig.ResetAwareRoutingConfig
 
 type ClientConfig = internalconfig.ClientConfig
 type CodexClientConfig = internalconfig.CodexClientConfig

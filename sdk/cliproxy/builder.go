@@ -206,6 +206,9 @@ func (b *Builder) Build() (*Service, error) {
 	if errValidate := b.cfg.ValidateCredentialWeights(); errValidate != nil {
 		return nil, fmt.Errorf("cliproxy: validate credential weights: %w", errValidate)
 	}
+	if errValidate := b.cfg.ValidateRouting(); errValidate != nil {
+		return nil, fmt.Errorf("cliproxy: validate routing settings: %w", errValidate)
+	}
 	b.cfg.NormalizePluginsConfig()
 	if errResolvePluginsDir := b.cfg.ResolvePluginsDir(); errResolvePluginsDir != nil && b.cfg.Plugins.Enabled {
 		return nil, fmt.Errorf("cliproxy: %w", errResolvePluginsDir)
@@ -292,6 +295,7 @@ func (b *Builder) Build() (*Service, error) {
 		appliedRoutingState: appliedRoutingState,
 		serverOptions:       append([]api.ServerOption(nil), b.serverOptions...),
 	}
+	service.configureResetAwareQuotaRefresh()
 	if b.postAuthHook != nil {
 		service.serverOptions = append(service.serverOptions, api.WithPostAuthHook(b.postAuthHook))
 	}

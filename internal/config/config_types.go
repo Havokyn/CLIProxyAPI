@@ -351,8 +351,12 @@ type QuotaExceeded struct {
 // RoutingConfig configures how credentials are selected for requests.
 type RoutingConfig struct {
 	// Strategy selects the credential selection strategy.
-	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first".
+	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first", "reset-aware".
 	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+
+	// ResetAware configures reset-aware cold-session routing. The strategy keeps
+	// this policy opt-in so existing routing modes retain their behavior.
+	ResetAware ResetAwareRoutingConfig `yaml:"reset-aware,omitempty" json:"reset-aware,omitempty"`
 
 	// SessionAffinity enables universal session-sticky routing for all clients.
 	// Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,
@@ -371,6 +375,34 @@ type RoutingConfig struct {
 	// When false, subagents are distributed across the credential pool via the fallback selector.
 	// Default: true. Ignored when SessionAffinity is false.
 	SessionAffinitySubagents *bool `yaml:"session-affinity-subagents,omitempty" json:"session-affinity-subagents,omitempty"`
+}
+
+// ResetAwareRoutingConfig configures quota-expiration-aware credential selection.
+// Pointer fields preserve the distinction between an omitted v8 setting and an
+// explicit false/zero value so management API round-trips remain lossless.
+type ResetAwareRoutingConfig struct {
+	// PreserveSessionAffinity keeps established sessions on their bound credential.
+	PreserveSessionAffinity *bool `yaml:"preserve-session-affinity,omitempty" json:"preserve-session-affinity,omitempty"`
+	// LongestWindowFirst makes the longest applicable normal quota reset the primary ordering key.
+	LongestWindowFirst *bool `yaml:"longest-window-first,omitempty" json:"longest-window-first,omitempty"`
+	// UseExpiringCapacityFirst enables the remaining-capacity/expiration-pressure secondary key.
+	UseExpiringCapacityFirst *bool `yaml:"use-expiring-capacity-first,omitempty" json:"use-expiring-capacity-first,omitempty"`
+	// MinLongWindowRemainingPercent protects new sessions from nearly exhausted long windows.
+	MinLongWindowRemainingPercent *float64 `yaml:"min-long-window-remaining-percent,omitempty" json:"min-long-window-remaining-percent,omitempty"`
+	// MinShortWindowRemainingPercent protects new sessions from nearly exhausted short windows.
+	MinShortWindowRemainingPercent *float64 `yaml:"min-short-window-remaining-percent,omitempty" json:"min-short-window-remaining-percent,omitempty"`
+	// ReservePolicy controls when reserve windows can be selected. The default is last-resort.
+	ReservePolicy string `yaml:"reserve-policy,omitempty" json:"reserve-policy,omitempty"`
+	// AutoUseManualResets is intentionally forbidden when true; manual reset credits are operator-controlled.
+	AutoUseManualResets *bool `yaml:"auto-use-manual-resets,omitempty" json:"auto-use-manual-resets,omitempty"`
+	// RefreshAfterReset requires a fresh authoritative observation after a window reset.
+	RefreshAfterReset *bool `yaml:"refresh-after-reset,omitempty" json:"refresh-after-reset,omitempty"`
+	// StaleTelemetryPolicy controls behavior when quota observations are stale or incomplete.
+	StaleTelemetryPolicy string `yaml:"stale-telemetry-policy,omitempty" json:"stale-telemetry-policy,omitempty"`
+	// FallbackStrategy is used when stale telemetry prevents reset-aware ranking.
+	FallbackStrategy string `yaml:"fallback-strategy,omitempty" json:"fallback-strategy,omitempty"`
+	// TelemetryMaxAge bounds how long an observation remains fresh without a newer response.
+	TelemetryMaxAge string `yaml:"telemetry-max-age,omitempty" json:"telemetry-max-age,omitempty"`
 }
 
 // OAuthModelAlias defines a model ID alias for a specific channel.

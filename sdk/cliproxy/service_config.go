@@ -29,6 +29,7 @@ type routingRuntimeState struct {
 	sessionAffinity          bool
 	sessionAffinityTTL       time.Duration
 	sessionAffinitySubagents bool
+	resetAware               coreauth.ResetAwareSelectorConfig
 }
 
 func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
@@ -46,8 +47,33 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 		state.strategy = "weighted-round-robin"
 	case "fill-first", "fillfirst", "ff":
 		state.strategy = "fill-first"
+	case "reset-aware", "resetaware", "quota-reset-aware":
+		state.strategy = "reset-aware"
+		effective := cfg.Routing.ResetAware.WithDefaults()
+		telemetryMaxAge := coreauth.ResetAwareSelectorConfig{}.TelemetryMaxAge
+		if parsed, errParse := time.ParseDuration(strings.TrimSpace(effective.TelemetryMaxAge)); errParse == nil && parsed > 0 {
+			telemetryMaxAge = parsed
+		}
+		state.resetAware = coreauth.ResetAwareSelectorConfig{
+			PreserveSessionAffinity:        *effective.PreserveSessionAffinity,
+			LongestWindowFirst:             *effective.LongestWindowFirst,
+			UseExpiringCapacityFirst:       *effective.UseExpiringCapacityFirst,
+			MinLongWindowRemainingPercent:  *effective.MinLongWindowRemainingPercent,
+			MinShortWindowRemainingPercent: *effective.MinShortWindowRemainingPercent,
+			ReservePolicy:                  effective.ReservePolicy,
+			AutoUseManualResets:            *effective.AutoUseManualResets,
+			RefreshAfterReset:              *effective.RefreshAfterReset,
+			StaleTelemetryPolicy:           effective.StaleTelemetryPolicy,
+			FallbackStrategy:               effective.FallbackStrategy,
+			TelemetryMaxAge:                telemetryMaxAge,
+		}
 	}
 	state.sessionAffinity = cfg.Routing.SessionAffinity
+	if state.strategy == "reset-aware" {
+		// Reset-aware is a cold-session placement policy. Keep bindings sticky by
+		// default, while allowing an explicit nested setting to opt out.
+		state.sessionAffinity = state.resetAware.PreserveSessionAffinity
+	}
 	if ttl := strings.TrimSpace(cfg.Routing.SessionAffinityTTL); ttl != "" {
 		if parsed, errParse := time.ParseDuration(ttl); errParse == nil && parsed > 0 {
 			if parsed < time.Second {
@@ -69,6 +95,8 @@ func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
 		selector = &coreauth.WeightedRoundRobinSelector{}
 	case "fill-first":
 		selector = &coreauth.FillFirstSelector{}
+	case "reset-aware":
+		selector = coreauth.NewResetAwareSelector(state.resetAware)
 	default:
 		selector = &coreauth.RoundRobinSelector{}
 	}
@@ -111,6 +139,10 @@ func (s *Service) commitConfigUpdate(newCfg *config.Config) configCommit {
 	}
 	if errValidate := newCfg.ValidateCredentialWeights(); errValidate != nil {
 		log.WithError(errValidate).Warn("rejected config update with invalid credential weights")
+		return configCommit{}
+	}
+	if errValidate := newCfg.ValidateRouting(); errValidate != nil {
+		log.WithError(errValidate).Warn("rejected config update with invalid routing settings")
 		return configCommit{}
 	}
 
@@ -218,6 +250,7 @@ func (s *Service) applyManagerConfig(ctx context.Context, commit configCommit) b
 		s.coreManager.SetSelector(newRoutingSelector(routingState))
 		s.appliedRoutingState = &routingState
 	}
+	s.configureResetAwareQuotaRefresh()
 	s.applyRetryConfig(commit.cfg)
 	store := s.resolveCooldownStateStore(commit.cfg)
 	if !s.coreManager.ApplyConfigWithCooldownStateStore(ctx, commit.cfg, store) {

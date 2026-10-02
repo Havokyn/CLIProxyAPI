@@ -106,6 +106,7 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 				c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})
 				return
 			}
+			h.recordFetchedQuotaObservation(c, auth, quotaResp)
 			c.JSON(http.StatusOK, quotaResp)
 			return
 		}
@@ -121,6 +122,7 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 						c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("quota probe failed: %v", errProbe)})
 						return
 					}
+					h.recordFetchedQuotaObservation(c, auth, quotaResp)
 					c.JSON(http.StatusOK, quotaResp)
 					return
 				}
@@ -294,7 +296,27 @@ func (h *Handler) fetchQuotaForPlugin(c *gin.Context, pluginID, authIndex string
 		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})
 		return
 	}
+	h.recordFetchedQuotaObservation(c, auth, quotaResp)
 	c.JSON(http.StatusOK, quotaResp)
+}
+
+// recordFetchedQuotaObservation feeds the existing normalized management quota
+// response back into the runtime credential state. This keeps a manual/managed
+// authoritative refresh on the same QuotaState used by reset-aware routing;
+// it does not create a second quota database and it never stores provider
+// response bodies or credential material.
+func (h *Handler) recordFetchedQuotaObservation(c *gin.Context, auth *coreauth.Auth, quotaResp pluginapi.QuotaFetchResponse) {
+	if h == nil || h.authManager == nil || auth == nil || len(quotaResp.Groups) == 0 {
+		return
+	}
+	observedAt := time.Now().UTC()
+	windows := coreauth.QuotaWindowsFromNormalizedGroups(auth.Provider, quotaResp.Groups, observedAt)
+	if len(windows) == 0 {
+		return
+	}
+	if _, errUpdate := h.authManager.RecordQuotaObservation(auth, coreauth.QuotaState{ObservedAt: observedAt, Windows: windows}); errUpdate != nil {
+		log.WithError(errUpdate).WithField("auth_index", auth.Index).Warn("failed to persist normalized quota observation")
+	}
 }
 
 // ResetPluginQuota handles DELETE /v0/management/plugins/:id/quota and POST /v0/management/plugins/:id/quota/reset

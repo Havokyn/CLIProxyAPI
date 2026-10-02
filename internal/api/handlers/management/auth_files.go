@@ -799,7 +799,7 @@ func authFileRequestRetryFromJSON(data []byte) (int, bool) {
 // fields are intentionally excluded so this management response cannot be
 // mistaken for scheduler state or influence scheduling behavior.
 func quotaObservationPayloadForProvider(provider string, quota coreauth.QuotaState) gin.H {
-	if !coreauth.ProviderSupportsQuotaObservation(provider) {
+	if !coreauth.ProviderSupportsQuotaObservation(provider) && len(quota.Windows) == 0 {
 		return quotaObservationPayload(coreauth.QuotaState{})
 	}
 	return quotaObservationPayload(quota)
@@ -815,19 +815,25 @@ func quotaObservationPayload(quota coreauth.QuotaState) gin.H {
 		signals[key] = value
 	}
 	observed["signals"] = signals
+	if len(quota.Windows) > 0 {
+		// QuotaWindow contains normalized timing/capacity telemetry only. It has
+		// no bearer, OAuth, client-key, or raw auth fields, so CPAMC can render
+		// reset-aware diagnostics without receiving credential material.
+		observed["windows"] = quota.Windows
+	}
 	return observed
 }
 
 func modelQuotaObservationPayload(provider string, states map[string]*coreauth.ModelState) gin.H {
-	if !coreauth.ProviderSupportsQuotaObservation(provider) {
-		return gin.H{}
-	}
 	observations := gin.H{}
 	for model, state := range states {
 		if state == nil {
 			continue
 		}
-		if state.Quota.ObservedAt.IsZero() && len(state.Quota.Signals) == 0 {
+		if !coreauth.ProviderSupportsQuotaObservation(provider) && len(state.Quota.Windows) == 0 {
+			continue
+		}
+		if state.Quota.ObservedAt.IsZero() && len(state.Quota.Signals) == 0 && len(state.Quota.Windows) == 0 {
 			continue
 		}
 		observations[model] = quotaObservationPayloadForProvider(provider, state.Quota)

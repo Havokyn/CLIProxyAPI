@@ -72,6 +72,23 @@ func isBuiltInSelector(selector Selector) bool {
 	}
 }
 
+// selectorUsesAllPriorityTiers identifies selectors whose own policy must see
+// every eligible priority tier. Reset-aware routing intentionally applies
+// quota expiration before legacy priority; session affinity delegates this
+// decision to its fallback selector for cold bindings.
+func selectorUsesAllPriorityTiers(selector Selector) bool {
+	if selector == nil {
+		return false
+	}
+	if across, ok := selector.(interface{ UsesAllPriorityTiers() bool }); ok {
+		return across.UsesAllPriorityTiers()
+	}
+	if affinity, ok := selector.(*SessionAffinitySelector); ok && affinity != nil {
+		return selectorUsesAllPriorityTiers(affinity.fallback)
+	}
+	return false
+}
+
 type requiredAuthKindContextKey struct{}
 type credentialPolicyContextKey struct{}
 
@@ -620,8 +637,9 @@ func (m *Manager) availableAuthsForRouteModelWithPriorityMode(auths []*Auth, pro
 func (m *Manager) availableAuthsForSelector(selector Selector, auths []*Auth, provider, routeModel string, now time.Time) (priorityAuths, selectorAuths []*Auth, err error) {
 	_, sessionAffinity := selector.(*SessionAffinitySelector)
 	schedulerAcross := m.pluginSchedulerWantsAcrossPrioritiesLocked()
+	selectorAcross := selectorUsesAllPriorityTiers(selector)
 
-	if !sessionAffinity && !schedulerAcross {
+	if !sessionAffinity && !schedulerAcross && !selectorAcross {
 		priorityAuths, err = m.availableAuthsForRouteModel(auths, provider, routeModel, now)
 		if err != nil {
 			return nil, nil, err
@@ -644,7 +662,7 @@ func (m *Manager) availableAuthsForSelector(selector Selector, auths []*Auth, pr
 		priorityAuths = highestPriorityAuths(allAuths)
 	}
 
-	if sessionAffinity {
+	if sessionAffinity || selectorAcross {
 		selectorAuths = allAuths
 	} else {
 		selectorAuths = highestPriorityAuths(allAuths)
@@ -2064,6 +2082,11 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	m.mu.RLock()
 	selector := m.selector
 	opts.Metadata[cliproxyexecutor.SessionAffinityModelMetadataKey] = selectionArgForSelector(selector, model)
+	if selectorUsesAllPriorityTiers(selector) {
+		// Mixed routes keep provider pools isolated. The reset-aware selector uses
+		// this route order to choose a pool before comparing credentials within it.
+		opts.Metadata[resetAwareProviderOrderMetadataKey] = append([]string(nil), providers...)
+	}
 	pluginScheduler := m.pluginScheduler
 	candidates := make([]*Auth, 0, len(m.auths))
 	modelKey := strings.TrimSpace(model)

@@ -45,13 +45,20 @@ func TestModelQuotaObservationPayloadSkipsNilAndEmptyStates(t *testing.T) {
 }
 
 func TestQuotaObservationPayloadExcludesCooldownState(t *testing.T) {
+	now := time.Unix(10, 0).UTC()
 	payload := quotaObservationPayload(coreauth.QuotaState{
 		Exceeded:      true,
 		Reason:        "credential_quota",
 		NextRecoverAt: time.Unix(20, 0),
 		BackoffLevel:  3,
-		ObservedAt:    time.Unix(10, 0),
+		ObservedAt:    now,
 		Signals:       map[string]string{"X-Codex-Plan-Type": "pro"},
+		Windows: []coreauth.QuotaWindow{{
+			Name:             "weekly",
+			RemainingPercent: 27,
+			ResetAt:          now.Add(time.Hour),
+			ObservedAt:       now,
+		}},
 	})
 	if _, ok := payload["exceeded"]; ok {
 		t.Fatalf("cooldown exceeded leaked: %#v", payload)
@@ -64,5 +71,8 @@ func TestQuotaObservationPayloadExcludesCooldownState(t *testing.T) {
 	}
 	if _, ok := payload["backoff_level"]; ok {
 		t.Fatalf("cooldown backoff leaked: %#v", payload)
+	}
+	if _, ok := payload["windows"]; !ok {
+		t.Fatalf("normalized quota windows missing: %#v", payload)
 	}
 }

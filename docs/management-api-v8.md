@@ -91,6 +91,8 @@ retain the corresponding business operation's fields.
 | `/server/latest-version` | GET | Get latest release information. |
 | `/requests/api-call` | POST | Make an authenticated upstream call. |
 | `/routing/cooldown/reset` | POST | Clear credential cooldown. |
+| `/routing/reset-aware` | GET | Preview or explain runtime quota ranking; accepts `provider` and `model`. |
+| `/routing/quota/refresh` | POST | Read authoritative Codex OAuth usage into runtime observations; body: `{"auth_index":"..."}`. |
 | `/routing/model-definitions/<channel>` | GET | Get model definitions. |
 | `/observability/logs` | GET, DELETE | Read or clear application logs. |
 | `/observability/logs/errors` | GET | List error-log files. |
@@ -114,6 +116,19 @@ retain the corresponding business operation's fields.
 | `/plugins/store` | GET | List the plugin store. |
 | `/plugins/store/<id>/install` | POST | Install or update a plugin. |
 | `/plugins/<id>/quota` | GET, POST, DELETE | Read, fetch, or reset plugin quota. |
+
+Quota refresh reads ChatGPT's `/backend-api/wham/usage` using the credential's
+executor transport. Management and routing share a per-credential 30-second
+minimum probe interval, including failures. Only normalized observation fields
+are merged into `Auth.Quota`; cooldowns and OAuth files are untouched. Missing,
+stale, and reset-due observations refresh on cold selection when reset-aware
+refresh is enabled. Native routing probes run asynchronously with request
+cancellation, at most two in flight, so provider latency does not hold inference
+selection. Until a new observation arrives, routing uses the configured
+fallback. Failed probes preserve observations and use the configured
+fallback. Manual reset credits are never consumed automatically. Quota ranking
+is opt-in through `routing.strategy: reset-aware`; the diagnostic GET remains
+read-only under other strategies.
 
 ## OAuth
 

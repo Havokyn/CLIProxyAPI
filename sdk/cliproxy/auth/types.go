@@ -171,6 +171,34 @@ type RecentRequestBucket struct {
 	Failed  int64  `json:"failed"`
 }
 
+// QuotaWindow is one normalized provider quota window. It deliberately carries
+// only nonsecret telemetry so it can be copied into scheduler snapshots and
+// exposed through management diagnostics.
+type QuotaWindow struct {
+	// Name is the provider/window label (for example 5h, 7d, or weekly).
+	Name string `json:"name"`
+	// RemainingPercent is the usable percentage at the observation time.
+	RemainingPercent float64 `json:"remaining_percent"`
+	// ResetAt is the authoritative reset/recovery timestamp when known.
+	ResetAt time.Time `json:"reset_at,omitempty"`
+	// DurationSeconds identifies the window horizon when the provider supplies it.
+	DurationSeconds int64 `json:"duration_seconds,omitempty"`
+	// ObservedAt records when this window was captured, if it differs from the
+	// credential-level observation timestamp.
+	ObservedAt time.Time `json:"observed_at,omitempty"`
+	// Reserve marks capacity that is held behind normal capacity by policy.
+	Reserve bool `json:"reserve,omitempty"`
+	// ManualReset marks operator-controlled reset credits. These are never
+	// selected automatically by reset-aware routing.
+	ManualReset bool `json:"manual_reset,omitempty"`
+	// Exhausted is an explicit provider exhaustion signal.
+	Exhausted bool `json:"exhausted,omitempty"`
+	// Model limits the window to one model when provider telemetry is model-specific.
+	Model string `json:"model,omitempty"`
+	// Provider limits the window to one provider/channel when necessary.
+	Provider string `json:"provider,omitempty"`
+}
+
 // QuotaState contains limiter tracking data for a credential.
 type QuotaState struct {
 	// Exceeded indicates the credential recently hit a quota error.
@@ -190,6 +218,9 @@ type QuotaState struct {
 	// Cooldown transitions must use applyCooldownFields so they cannot replace
 	// this snapshot.
 	Signals map[string]string `json:"signals,omitempty"`
+	// Windows is the normalized form of Signals used by reset-aware routing.
+	// It is observation data and is intentionally independent from cooldown state.
+	Windows []QuotaWindow `json:"windows,omitempty"`
 }
 
 // Clone returns an independent copy of the quota state.
@@ -200,6 +231,9 @@ func (q QuotaState) Clone() QuotaState {
 		for key, value := range q.Signals {
 			copyQuota.Signals[key] = value
 		}
+	}
+	if len(q.Windows) > 0 {
+		copyQuota.Windows = append([]QuotaWindow(nil), q.Windows...)
 	}
 	return copyQuota
 }

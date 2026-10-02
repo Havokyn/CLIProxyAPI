@@ -220,6 +220,9 @@ func (m *Manager) updateInternal(ctx context.Context, base, auth *Auth, mode upd
 	} else {
 		auth.Generation++
 	}
+	if CredentialsChanged(existing, auth) {
+		m.quotaProbeStates.Delete(auth.ID)
+	}
 	cooldownStateChanged := false
 	if !existing.Disabled && existing.Status != StatusDisabled && !auth.Disabled && auth.Status != StatusDisabled {
 		if len(auth.ModelStates) == 0 && len(existing.ModelStates) > 0 {
