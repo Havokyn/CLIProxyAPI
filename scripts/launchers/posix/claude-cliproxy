@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$SCRIPT_DIR/cliproxy-env.sh"
+cliproxy_settings || { code=$?; [ "$code" -eq 10 ] && exit 0; exit "$code"; }
+export ANTHROPIC_BASE_URL=${CLIPROXY_BASE_URL%/}
+unset ANTHROPIC_API_KEY
+export ANTHROPIC_AUTH_TOKEN=$CLIPROXY_KEY
+exec "${CLAUDE_BIN:-claude}" --model "${CLIPROXY_CLAUDE_MODEL:-$CLIPROXY_MODEL}" "$@"

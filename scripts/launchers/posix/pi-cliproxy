@@ -1,0 +1,36 @@
+#!/bin/sh
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$SCRIPT_DIR/cliproxy-env.sh"
+cliproxy_settings || { code=$?; [ "$code" -eq 10 ] && exit 0; exit "$code"; }
+export CLIPROXY_API_KEY=$CLIPROXY_KEY
+# Merge the opt-in provider so endpoint overrides are effective; direct providers survive.
+python3 - "$CLIPROXY_BASE_URL" "$CLIPROXY_MODEL" <<'PY'
+import json, os, sys, tempfile
+from pathlib import Path
+path = Path.home() / '.pi/agent/models.json'
+try:
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        raise ValueError()
+    data = json.loads(path.read_text()) if path.exists() else {}
+    provider = data.setdefault('providers', {}).setdefault('cliproxy', {})
+    provider.update({'baseUrl': sys.argv[1] + '/v1', 'api': 'openai-responses', 'apiKey': '${CLIPROXY_API_KEY}'})
+    models = provider.setdefault('models', [])
+    if not any(item.get('id') == sys.argv[2] for item in models):
+        models.append({'id': sys.argv[2], 'name': sys.argv[2] + ' via CLIProxy', 'reasoning': True})
+    content = json.dumps(data, indent=2) + '\n'
+    if not path.exists() or path.read_text() != content:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=path.parent)
+        try:
+            with os.fdopen(fd, 'w') as handle:
+                handle.write(content)
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, path)
+        finally:
+            if os.path.exists(tmp): os.unlink(tmp)
+except Exception:
+    print('Pi opt-in configuration failed; no runtime launched.', file=sys.stderr)
+    sys.exit(2)
+PY
+exec "${PI_BIN:-pi}" --model "${CLIPROXY_PI_PROVIDER:-cliproxy}/${CLIPROXY_MODEL}" "$@"

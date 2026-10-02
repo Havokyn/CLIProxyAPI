@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "health_state": "healthy",
+  "generated_at_utc": "2026-01-01T00:00:00Z",
+  "local": {
+    "listener": "listening",
+    "process": "running",
+    "models": {"state": "observed", "http_status": 200, "model_count": 2},
+    "management_ui": {"state": "observed", "http_status": 200, "model_count": null},
+    "reset_aware": {"state": "not_checked_missing_management_key", "http_status": null}
+  },
+  "machines": [
+    {
+      "label": "compute-1",
+      "ssh_target": "compute-1",
+      "credential_label": "compute-1-client",
+      "status": {
+        "os": "Linux",
+        "tailscale": {"state": "Running", "online": true, "hostname": "compute-1.example.ts.net", "ips": []},
+        "credential_state": "configured",
+        "proxy": {"http_status": 200, "reachable": true, "valid_response": true, "model_count": 2},
+        "runtimes": {"pi": true, "claude": true, "codex": false},
+        "launchers": {"pi": true, "claude": true, "codex": false},
+        "herdr_available": true,
+        "agent_count": null,
+        "e2e_state": "not_tested",
+        "bootstrap": "not_requested"
+      }
+    }
+  ]
+}

@@ -31,6 +31,7 @@ auths/*
 # Documentation
 docs/*
 !docs/management-api-v8.md
+!docs/havok-fleet.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md
@@ -67,3 +68,21 @@ docker-compose.override.yml
 
 # Local LLM Wiki vault
 .llm-wiki
+
+# Local fleet state and credentials; source examples stay tracked.
+.local/
+machine-keys/
+credentials.json
+client.key
+management.key
+*.private.key
+id_rsa
+id_ed25519
+.cli-proxy-api/
+.tailscale/
+.env.local
+.env.*.local
+fleet.local.json
+fleet-inventory.json
+havok-fleet-inventory*.json
+__pycache__/

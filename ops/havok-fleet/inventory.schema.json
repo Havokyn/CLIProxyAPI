@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Havok fleet observed inventory v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at_utc",
+    "health_state",
+    "local",
+    "machines"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "health_state": {
+      "enum": [
+        "healthy",
+        "degraded"
+      ]
+    },
+    "local": {
+      "type": "object",
+      "properties": {
+        "listener": {
+          "type": "string"
+        },
+        "process": {
+          "type": "string"
+        },
+        "models": {
+          "type": "object",
+          "properties": {
+            "http_status": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "model_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "reset_aware_enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "management_ui": {
+          "type": "object",
+          "properties": {
+            "http_status": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "model_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "reset_aware_enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "reset_aware": {
+          "type": "object",
+          "properties": {
+            "http_status": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "model_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "reset_aware_enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "listener",
+        "process",
+        "models",
+        "management_ui",
+        "reset_aware"
+      ],
+      "additionalProperties": false
+    },
+    "machines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "label",
+          "ssh_target",
+          "credential_label",
+          "status"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "ssh_target": {
+            "type": "string"
+          },
+          "credential_label": {
+            "type": "string"
+          },
+          "status": {
+            "type": "object",
+            "properties": {
+              "os": {
+                "type": "string"
+              },
+              "tailscale": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string"
+                  },
+                  "online": {
+                    "type": "boolean"
+                  },
+                  "hostname": {
+                    "type": "string"
+                  },
+                  "ips": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "credential_state": {
+                "enum": [
+                  "configured",
+                  "key_missing",
+                  "key_unsafe",
+                  "key_permissions_invalid",
+                  "key_invalid"
+                ]
+              },
+              "proxy": {
+                "type": "object",
+                "properties": {
+                  "http_status": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "reachable": {
+                    "type": "boolean"
+                  },
+                  "valid_response": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "runtimes": {
+                "type": "object",
+                "properties": {
+                  "pi": {
+                    "type": "boolean"
+                  },
+                  "claude": {
+                    "type": "boolean"
+                  },
+                  "codex": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pi",
+                  "claude",
+                  "codex"
+                ],
+                "additionalProperties": false
+              },
+              "launchers": {
+                "type": "object",
+                "properties": {
+                  "pi": {
+                    "type": "boolean"
+                  },
+                  "claude": {
+                    "type": "boolean"
+                  },
+                  "codex": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "pi",
+                  "claude",
+                  "codex"
+                ],
+                "additionalProperties": false
+              },
+              "herdr_available": {
+                "type": "boolean"
+              },
+              "herdr_bindings_installed": {
+                "type": "boolean"
+              },
+              "agent_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "e2e_state": {
+                "enum": [
+                  "not_tested",
+                  "verified",
+                  "failed"
+                ]
+              },
+              "bootstrap": {
+                "type": "string"
+              },
+              "probe_state": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "machines": [
+    {
+      "label": "compute-1",
+      "ssh_target": "compute-1",
+      "endpoint": "https://gateway.example.ts.net",
+      "credential_label": "compute-1-client"
+    }
+  ]
+}
