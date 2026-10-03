@@ -72,6 +72,12 @@ def main():
                 raise RuntimeError('Locked source snapshot changed')
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+        # Overlaying CRLF onto an LF checkout can leave Git's stat cache dirty
+        # even when converted blob hashes match. Normalize only this disposable
+        # index and require identical ancestry/tree before accepting it as clean.
+        git('add', '--all')
+        if git('write-tree') != git('rev-parse', 'HEAD^{tree}'):
+            raise RuntimeError('Snapshot content differs from the candidate tree')
         result = subprocess.run([sys.executable, 'tools/local_ci.py', '--linux'], cwd=repo, env=env)
         reports = list((repo / '.local-ci/results').glob('*/summary.json'))
         if len(reports) != 1:

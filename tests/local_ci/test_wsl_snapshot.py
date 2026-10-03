@@ -30,6 +30,14 @@ class SnapshotTests(unittest.TestCase):
     def test_manifest_digest_tamper_refused(self):
         self.exercise(tamper=True)
 
+    @unittest.skipIf(os.name == 'nt', 'Native Linux CRLF overlay fixture')
+    def test_crlf_overlay_has_same_tree_and_clean_index(self):
+        self.exercise(crlf=True)
+
+    @unittest.skipIf(os.name == 'nt', 'Native Linux modified source fixture')
+    def test_modified_source_cannot_claim_exact_candidate(self):
+        self.exercise(modified=True)
+
     @unittest.skipIf(os.name == 'nt', 'Native Linux link fixture')
     def test_dangling_output_refused(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -40,7 +48,7 @@ class SnapshotTests(unittest.TestCase):
                 snapshot.bounded(path, Path(temporary))
             self.assertFalse(outside.exists())
 
-    def exercise(self, tamper=False):
+    def exercise(self, tamper=False, crlf=False, modified=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'repository'
             root.mkdir()
@@ -72,6 +80,10 @@ dirty=bool(subprocess.check_output(['git','status','--porcelain'],text=True).str
                 target = source / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 data = (root / relative).read_bytes()
+                if crlf:
+                    data = data.replace(b'\n', b'\r\n')
+                if modified and relative == 'tools/local_ci.py':
+                    data += b'\n# source differs from the candidate\n'
                 target.write_bytes(data)
                 files[relative] = hashlib.sha256(data).hexdigest()
             manifest = dict(files=files,source_digest=hashlib.sha256(json.dumps(files,sort_keys=True).encode()).hexdigest())
@@ -81,7 +93,7 @@ dirty=bool(subprocess.check_output(['git','status','--porcelain'],text=True).str
             destination = root / '.local-ci/results/outer'
             destination.mkdir(parents=True)
             with patch('sys.argv', ['snapshot', str(root/'.git'), str(source), sha, str(destination)]):
-                if tamper:
+                if tamper or modified:
                     with self.assertRaises(RuntimeError):
                         snapshot.main()
                 else:
