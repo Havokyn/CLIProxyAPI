@@ -147,7 +147,7 @@ func newClaudeFastDirectResponseError(resp *http.Response, body []byte) error {
 	credentialScoped := false
 	if resp.StatusCode == http.StatusTooManyRequests {
 		retryAfter = helps.ParseClaudeRateLimitReset(resp.Header, time.Now())
-		if helps.ClaudeHeadersIndicateUnifiedRateLimitRejection(resp.Header) {
+		if helps.ClaudeHeadersIndicateUnifiedRateLimitRejection(resp.Header) || claudeBodyIndicatesWeeklyLimit(body) {
 			credentialScoped = true
 		}
 	}

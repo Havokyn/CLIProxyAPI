@@ -702,7 +702,7 @@ func classifyClaudeUpstreamErrorWithCooling(statusCode int, headers http.Header,
 	}
 	err := statusErr{code: statusCode, msg: string(body), retryAfter: retryAfter}
 	if statusCode == http.StatusTooManyRequests {
-		if !modelLevelCooling && helps.ClaudeHeadersIndicateUnifiedRateLimitRejection(headers) {
+		if !modelLevelCooling && (helps.ClaudeHeadersIndicateUnifiedRateLimitRejection(headers) || claudeBodyIndicatesWeeklyLimit(body)) {
 			return claudeRateLimitError{statusErr: err, credentialScoped: true}
 		}
 		if claudeBodyIndicatesFastModeCredits(body) {
@@ -712,6 +712,16 @@ func classifyClaudeUpstreamErrorWithCooling(statusCode int, headers http.Header,
 		return claudeRateLimitError{statusErr: err, credentialScoped: false}
 	}
 	return err
+}
+
+// A structured weekly-capacity refusal also identifies the shared subscription
+// limit when the provider omits unified rate-limit headers.
+func claudeBodyIndicatesWeeklyLimit(body []byte) bool {
+	if gjson.GetBytes(body, "type").String() != "error" || gjson.GetBytes(body, "error.type").String() != "rate_limit_error" {
+		return false
+	}
+	message := strings.ToLower(gjson.GetBytes(body, "error.message").String())
+	return strings.Contains(message, "7-day rate limit") || strings.Contains(message, "weekly limit") || strings.Contains(message, "weekly usage limit")
 }
 
 // claudeBodyIndicatesFastModeCredits matches Anthropic's fast-mode entitlement

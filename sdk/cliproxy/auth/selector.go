@@ -1043,9 +1043,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	// A single availability pass serves both lookups: the bound credential is validated against
 	// every priority tier, while the fallback selector keeps seeing only the highest tier.
 	available, err := getSelectorAvailableAuthsAcrossPriorities(ctx, availabilityCandidates, provider, model, now)
-	if err != nil {
-		return nil, err
-	}
+	available = s.affinityAvailableAuths(provider, model, available)
 	fallbackAuths := sessionFallbackAuths(s.fallback, available)
 
 	modelKey := canonicalModelKey(model)
@@ -1060,6 +1058,24 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	fallbackKey := ""
 	if fallbackID != "" && fallbackID != primaryID {
 		fallbackKey = provider + "::" + fallbackID + "::" + modelKey
+	}
+	// Release unusable aliases even if no replacement is currently available.
+	for _, key := range []string{cacheKey, fallbackKey} {
+		if cachedID, ok := s.cache.Get(key); ok {
+			usable := false
+			for _, auth := range available {
+				if auth.ID == cachedID {
+					usable = true
+					break
+				}
+			}
+			if !usable {
+				s.cache.CompareAndDelete(key, cachedID)
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
 	}
 	bind := func(authID string) {
 		if fallbackKey != "" && !isSubagent && !isFork {
@@ -1152,11 +1168,19 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 		availabilityCandidates = positiveWeightAuths(auths)
 	}
 	available, errAvailable := getSelectorAvailableAuthsAcrossPriorities(ctx, availabilityCandidates, provider, model, time.Now())
-	if errAvailable != nil {
-		return nil, true, errAvailable
-	}
+	available = s.affinityAvailableAuths(provider, model, available)
 
 	if match, ok := s.matcher.MatchFingerprintsWithContext(namespace, fingerprints, tailFingerprints, envDigest, minPrefixLength); ok {
+		usable := false
+		for _, auth := range available {
+			if auth != nil && auth.ID == match.AuthID {
+				usable = true
+				break
+			}
+		}
+		if !usable {
+			s.matcher.InvalidateAuthInNamespaceBefore(namespace, match.AuthID, match.AccessNumber)
+		}
 		for _, auth := range available {
 			if auth == nil || auth.ID != match.AuthID {
 				continue
@@ -1197,6 +1221,9 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 			}
 			return auth, true, nil
 		}
+	}
+	if errAvailable != nil {
+		return nil, true, errAvailable
 	}
 
 	fallbackAuths := sessionFallbackAuths(s.fallback, available)
@@ -1242,6 +1269,20 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 		}
 	}
 	return auth, true, nil
+}
+
+func (s *SessionAffinitySelector) affinityAvailableAuths(provider, model string, auths []*Auth) []*Auth {
+	resetAware := ResetAwareSelectorFrom(s.fallback)
+	if resetAware == nil {
+		return auths
+	}
+	usable := make([]*Auth, 0, len(auths))
+	for _, auth := range auths {
+		if resetAware.AffinityUsable(provider, model, auth) {
+			usable = append(usable, auth)
+		}
+	}
+	return usable
 }
 
 func canonicalLCPProvider(provider string) string {
@@ -1567,6 +1608,17 @@ func (s *SessionAffinitySelector) OnResult(res Result) {
 	s.cache.CompareAndDelete(cacheKey, res.AuthID)
 	if fallbackKey != "" {
 		s.cache.CompareAndDelete(fallbackKey, res.AuthID)
+	}
+}
+
+// ReleaseReservation releases an inner selector's cold-placement reservation
+// without recording a result or changing session affinity.
+func (s *SessionAffinitySelector) ReleaseReservation(authID string) {
+	if s == nil || s.fallback == nil || strings.TrimSpace(authID) == "" {
+		return
+	}
+	if releaser, ok := s.fallback.(interface{ ReleaseReservation(string) }); ok && releaser != nil {
+		releaser.ReleaseReservation(authID)
 	}
 }
 

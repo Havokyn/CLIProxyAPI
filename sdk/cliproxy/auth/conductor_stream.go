@@ -251,6 +251,10 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 				return nil, errCtx
 			}
 			if allowRetry && !ephemeralResult {
+				if claudeAmbiguousExecution(auth, errStream) {
+					m.releaseSelectorReservation(auth.ID)
+					return nil, wrapRequestStopError(errStream)
+				}
 				alreadyTried := didRefreshOnUnauthorized
 				refreshed, okRefresh := m.tryRefreshAfterUnauthorized(newUpstreamAttemptContext(ctx), auth, errStream, alreadyTried)
 				if okRefresh {
@@ -287,6 +291,10 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 		streamResult, errStream = validateStreamResult(streamResult, errStream)
 		errStream = markUpstreamExecutionAttemptFromContext(ctx, errStream)
 		if errStream != nil {
+			if claudeAmbiguousExecution(auth, errStream) {
+				m.releaseSelectorReservation(auth.ID)
+				return nil, wrapRequestStopError(errStream)
+			}
 			rerr := resultErrorFromError(errStream)
 			action, okAction := matchRequestScopedErrorAction(auth, errStream, m.runtimeConfigSnapshot())
 			result := Result{AuthID: auth.ID, Provider: provider, Model: resultModel, RouteModel: routeModel, Success: false, Error: rerr, Options: execOpts}
@@ -322,6 +330,11 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 			upstreamErr = newStreamBootstrapError(bootstrapErr, streamResult.Headers)
 		}
 		if bootstrapErr != nil {
+			if claudeAmbiguousExecution(auth, bootstrapErr) {
+				m.releaseSelectorReservation(auth.ID)
+				discardStreamChunks(streamResult.Chunks)
+				return nil, wrapRequestStopError(bootstrapErr)
+			}
 			if errCtx := ctx.Err(); errCtx != nil {
 				discardStreamChunks(streamResult.Chunks)
 				return nil, errCtx
@@ -372,6 +385,13 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 			}
 		}
 		if bootstrapErr != nil {
+			// Authorization recovery can itself dispatch an ambiguous attempt.
+			// Recheck after that retry before trying another pooled model.
+			if claudeAmbiguousExecution(auth, bootstrapErr) {
+				m.releaseSelectorReservation(auth.ID)
+				discardStreamChunks(streamResult.Chunks)
+				return nil, wrapRequestStopError(bootstrapErr)
+			}
 			action, okAction := matchRequestScopedErrorAction(auth, bootstrapErr, m.runtimeConfigSnapshot())
 			if okAction {
 				rerr := resultErrorFromError(bootstrapErr)
@@ -434,6 +454,10 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 
 		if closed && len(buffered) == 0 {
 			emptyErr := markUpstreamExecutionAttemptFromContext(ctx, &Error{Code: "empty_stream", Message: "upstream stream closed before first payload", Retryable: true})
+			if claudeAmbiguousExecution(auth, emptyErr) {
+				m.releaseSelectorReservation(auth.ID)
+				return nil, wrapRequestStopError(emptyErr)
+			}
 			currentErr := newStreamBootstrapError(emptyErr, streamResult.Headers)
 			if hasUpstreamExecutionAttempt(emptyErr) {
 				upstreamErr = currentErr

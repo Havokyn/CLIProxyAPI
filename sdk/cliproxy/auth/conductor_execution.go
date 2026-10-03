@@ -29,6 +29,26 @@ func newUpstreamAttemptContext(ctx context.Context) context.Context {
 	return cliproxyexecutor.WithUpstreamAttemptTracker(ctx)
 }
 
+// A transport failure or server-side failure after dispatch cannot establish
+// whether Claude executed the request. Do not replay it on another account.
+func claudeAmbiguousExecution(auth *Auth, err error) bool {
+	if auth == nil || !strings.EqualFold(auth.Provider, "claude") || err == nil || !hasUpstreamExecutionAttempt(err) {
+		return false
+	}
+	status := statusCodeFromError(err)
+	return status == 0 || status >= http.StatusInternalServerError
+}
+
+func (m *Manager) releaseSelectorReservation(authID string) {
+	if m == nil || strings.TrimSpace(authID) == "" {
+		return
+	}
+	selector := m.Selector()
+	if releaser, ok := selector.(interface{ ReleaseReservation(string) }); ok && releaser != nil {
+		releaser.ReleaseReservation(authID)
+	}
+}
+
 func claudeOAuthRequestCancellation(ctx context.Context, auth *Auth, err error) error {
 	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") || !strings.EqualFold(strings.TrimSpace(auth.Attributes["auth_kind"]), "oauth") {
 		return nil
@@ -602,6 +622,10 @@ func (m *Manager) executeMixedOnce(ctx context.Context, providers []string, req 
 				if errCtx := execCtx.Err(); errCtx != nil {
 					return cliproxyexecutor.Response{}, errCtx
 				}
+				if claudeAmbiguousExecution(auth, errExec) {
+					m.releaseSelectorReservation(auth.ID)
+					return cliproxyexecutor.Response{}, wrapRequestStopError(errExec)
+				}
 				refreshCtx := newUpstreamAttemptContext(execCtx)
 				if refreshed, okRefresh := m.tryRefreshAfterUnauthorized(refreshCtx, auth, errExec, didRefreshOnUnauthorized); okRefresh {
 					auth = refreshed
@@ -627,6 +651,10 @@ func (m *Manager) executeMixedOnce(ctx context.Context, providers []string, req 
 			}
 			if errCancel := claudeOAuthRequestCancellation(execCtx, auth, errExec); errCancel != nil {
 				return cliproxyexecutor.Response{}, errCancel
+			}
+			if claudeAmbiguousExecution(auth, errExec) {
+				m.releaseSelectorReservation(auth.ID)
+				return cliproxyexecutor.Response{}, wrapRequestStopError(errExec)
 			}
 			result := Result{AuthID: auth.ID, Provider: provider, Model: resultModel, RouteModel: routeModel, Success: errExec == nil, Options: execOpts}
 			if errExec != nil {
@@ -1173,6 +1201,13 @@ func (m *Manager) executeStreamMixedOnce(ctx context.Context, providers []string
 		}
 		streamResult, errStream := m.executeStreamWithModelPool(execCtx, executor, auth, provider, execReq, execOpts, routeModel, streamExecutionModel, models, pooled, aliasResult, routing, !homeMode || selection != nil, selection != nil)
 		if errStream != nil {
+			if claudeAmbiguousExecution(auth, errStream) {
+				if selection != nil {
+					releaseAttempt()
+					selection.End("ambiguous_execution")
+				}
+				return nil, wrapRequestStopError(errStream)
+			}
 			if hasUpstreamExecutionAttempt(errStream) {
 				upstreamErr = errStream
 			}

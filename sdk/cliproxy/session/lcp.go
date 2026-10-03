@@ -1017,6 +1017,23 @@ func (m *MerklePrefixMatcher) InvalidateAuth(authID string) {
 	}
 }
 
+// InvalidateAuthInNamespaceBefore releases unusable bindings without affecting
+// other namespaces or bindings touched by a newer concurrent request.
+func (m *MerklePrefixMatcher) InvalidateAuthInNamespaceBefore(namespace, authID string, maxGeneration uint64) {
+	if m == nil || namespace == "" || authID == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ns := m.groups[namespace]; ns != nil {
+		for _, group := range ns.groups {
+			if group.authID == authID && (maxGeneration == 0 || group.lastAccessNumber <= maxGeneration) {
+				m.removeGroupLocked(group)
+			}
+		}
+	}
+}
+
 // Clear removes all remembered prefix bindings.
 func (m *MerklePrefixMatcher) Clear() {
 	if m == nil {

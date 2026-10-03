@@ -146,6 +146,18 @@ func (s *ResetAwareSelector) SetQuotaRefreshFunc(refresh ResetAwareQuotaRefreshF
 // ordered before the legacy priority tie-breaker.
 func (s *ResetAwareSelector) UsesAllPriorityTiers() bool { return s != nil }
 
+// AffinityUsable checks capacity, not cold-placement ranking or safety floors.
+// A usable continuation stays sticky even when another credential ranks better.
+func (s *ResetAwareSelector) AffinityUsable(provider, model string, auth *Auth) bool {
+	if s == nil || auth == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assessment := s.assessLocked(canonicalSchedulingProvider(auth.Provider), model, auth, s.nowTime())
+	return assessment != nil && !assessment.blocked
+}
+
 // ResetAwareSelectorFrom unwraps the optional session-affinity wrapper and
 // returns the central reset-aware selector when it is active. Management
 // handlers use this narrow view to expose diagnostics without knowing the
@@ -335,9 +347,18 @@ func (s *ResetAwareSelector) OnResult(result Result) {
 	if s == nil || strings.TrimSpace(result.AuthID) == "" {
 		return
 	}
+	s.ReleaseReservation(result.AuthID)
+}
+
+// ReleaseReservation releases one cold-placement reservation without recording
+// an execution result or changing any credential or affinity state.
+func (s *ResetAwareSelector) ReleaseReservation(authID string) {
+	if s == nil || strings.TrimSpace(authID) == "" {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	authID := strings.TrimSpace(result.AuthID)
+	authID = strings.TrimSpace(authID)
 	reservations := s.reservations[authID]
 	if len(reservations) == 0 {
 		return
@@ -585,6 +606,12 @@ func (s *ResetAwareSelector) assessLocked(provider, model string, auth *Auth, no
 		assessment.telemetryState = "missing-model-window"
 		return assessment
 	}
+	// An exhausted window remains authoritative until its reset. Aging other
+	// telemetry must not turn known exhaustion into round-robin eligibility.
+	if reason := exhaustedQuotaWindowReason(applicable, now, s.config.ReservePolicy); reason != "" {
+		assessment.blocked = true
+		assessment.safetyFloor = reason
+	}
 	if observedAt.IsZero() {
 		for _, window := range applicable {
 			if window.ObservedAt.After(observedAt) {
@@ -592,13 +619,22 @@ func (s *ResetAwareSelector) assessLocked(provider, model string, auth *Auth, no
 			}
 		}
 	}
-	if observedAt.IsZero() || now.Sub(observedAt) > s.config.TelemetryMaxAge {
+	markStale := func() {
 		assessment.telemetryState = "stale"
+		// Stale reserve data cannot authorize spending reserve ahead of a
+		// healthy normal account when normal capacity is known exhausted.
+		if reason := exhaustedQuotaWindowReason(applicable, now, "normal-only"); reason != "" {
+			assessment.blocked = true
+			assessment.safetyFloor = reason
+		}
+	}
+	if observedAt.IsZero() || now.Sub(observedAt) > s.config.TelemetryMaxAge {
+		markStale()
 		return assessment
 	}
 	for _, window := range applicable {
 		if !window.ObservedAt.IsZero() && (window.ObservedAt.After(now.Add(time.Minute)) || now.Sub(window.ObservedAt) > s.config.TelemetryMaxAge) {
-			assessment.telemetryState = "stale"
+			markStale()
 			return assessment
 		}
 		if window.ResetAt.IsZero() {
@@ -684,6 +720,43 @@ func quotaWindowSetEligible(long, short *QuotaWindow, cfg ResetAwareSelectorConf
 		}
 	}
 	return true, ""
+}
+
+func exhaustedQuotaWindowReason(windows []QuotaWindow, now time.Time, reservePolicy string) string {
+	normalReason, reserveReason := "", ""
+	hasReserve, hasNormal, reserveUsable := false, false, true
+	for _, window := range windows {
+		if window.ManualReset {
+			continue
+		}
+		if window.Reserve {
+			hasReserve = true
+			if window.Exhausted || window.RemainingPercent <= 0 || !window.ResetAt.After(now) {
+				reserveUsable = false
+			}
+		} else {
+			hasNormal = true
+		}
+		if (!window.Exhausted && window.RemainingPercent > 0) || !window.ResetAt.After(now) {
+			continue
+		}
+		reason := "long-window-exhausted"
+		if quotaWindowDuration(window, window.ObservedAt) < 24*time.Hour {
+			reason = "short-window-exhausted"
+		}
+		if window.Reserve {
+			reserveReason = reason
+		} else {
+			normalReason = reason
+		}
+	}
+	if !hasNormal && hasReserve && reserveReason != "" {
+		return reserveReason
+	}
+	if normalReason != "" && hasReserve && reserveUsable && strings.EqualFold(reservePolicy, "last-resort") {
+		return ""
+	}
+	return normalReason
 }
 
 func longestQuotaWindow(windows []QuotaWindow, observedAt time.Time) *QuotaWindow {
@@ -838,7 +911,13 @@ func (s *ResetAwareSelector) pickFallbackLocked(ctx context.Context, provider, m
 	if s.fallback == nil {
 		return nil
 	}
-	selected, errPick := s.fallback.Pick(ctx, provider, model, opts, auths)
+	usable := make([]*Auth, 0, len(auths))
+	for _, auth := range auths {
+		if assessment := s.assessLocked(provider, model, auth, s.nowTime()); assessment != nil && !assessment.blocked {
+			usable = append(usable, auth)
+		}
+	}
+	selected, errPick := s.fallback.Pick(ctx, provider, model, opts, usable)
 	if errPick != nil {
 		return nil
 	}
@@ -993,7 +1072,16 @@ func quotaWindowsForRequest(auth *Auth, model string) ([]QuotaWindow, time.Time)
 	deduped := make([]QuotaWindow, 0, len(windows))
 	seen := make(map[string]int, len(windows))
 	for _, window := range windows {
-		key := strings.Join([]string{window.Name, window.Model, window.Provider}, "|")
+		name := window.Name
+		if strings.EqualFold(window.Provider, "claude") {
+			// The usage probe calls the shared 7d window "weekly"; passive
+			// inference headers call it "7d". They are the same observation.
+			switch strings.ToLower(name) {
+			case "weekly":
+				name = "7d"
+			}
+		}
+		key := strings.Join([]string{name, window.Model, window.Provider}, "|")
 		if index, exists := seen[key]; exists {
 			if window.ObservedAt.After(deduped[index].ObservedAt) {
 				deduped[index] = window
