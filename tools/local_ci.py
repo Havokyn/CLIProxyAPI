@@ -323,6 +323,7 @@ def main():
     runner.check('Secret Safety', [py, 'ops/havok-fleet/check-secret-safety.py', '--staged'])
     runner.check('Fleet Unit Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/fleet', '-v'], 'linux.log' if options.linux else 'windows.log')
     runner.check('CI Self Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/local_ci', '-v'])
+    runner.check('Upstream Sync Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/upstream_sync', '-v'])
     if options.linux:
         runner.check('POSIX / Bootstrap', [py, __file__, '--linux-static'], 'linux.log')
         return runner.finish()
