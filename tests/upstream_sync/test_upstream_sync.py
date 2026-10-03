@@ -234,7 +234,7 @@ class SyncTests(unittest.TestCase):
                 (out / 'cli-proxy-api.exe').write_bytes(b'fixture binary')
             return subprocess.CompletedProcess(args, 0, '', '')
         with patch.object(sync, 'prerequisites'), patch.object(sync, 'scan_candidate', return_value=([], [])), \
-                patch.object(sync, 'command', side_effect=fake_command):
+                patch.object(sync, 'command', side_effect=fake_command), patch.object(sync.shutil, 'which', return_value='pwsh'):
             # candidate() and diff use real Git; avoid intercepting their subprocesses.
             with patch.object(sync, 'candidate', return_value=(sha, data['reviewed_tree'])), patch.object(sync, 'git'):
                 result = sync.verify(self.root, directory, data, self.root)
