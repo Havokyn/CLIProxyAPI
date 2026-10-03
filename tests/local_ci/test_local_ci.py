@@ -59,6 +59,11 @@ class LocalCITests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ci.assert_no_reparse(root / '..' / 'unrelated', root)
 
+    def test_cache_path_can_be_checked_from_volume_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory) / 'isolated-cache'
+            ci.assert_no_reparse(cache, Path(cache.anchor))
+
     @unittest.skipUnless(os.name == 'nt', 'Windows junction safety')
     def test_source_snapshot_refuses_junction_without_touching_target(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -73,6 +73,13 @@ Claude/session/executor gate inside the locked CI snapshot proves cold weekly ex
 failover, healthy stickiness, capacity rejection/refresh, namespace invalidation
 and no ambiguous replay. Reports bind gates, candidate SHA/tree and binary hash.
 Any candidate change invalidates previous evidence. A failed gate stops the process.
+WSL checks use a disposable native Linux clone of the exact candidate, overlaid
+from the hash-verified locked source manifest. This avoids Windows worktree pointer
+incompatibility without modifying the original repository. Linux evidence records
+the same SHA and source digest and is copied into the Windows CI report.
+On large-cluster filesystems, set a process-scoped `HAVOK_CI_CACHE` to a dedicated
+NTFS cache directory if generated cache files exhaust disk space. No global Go or
+Git configuration is changed.
 
 ## Internal PR
 
