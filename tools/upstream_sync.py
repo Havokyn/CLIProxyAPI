@@ -181,7 +181,11 @@ def contained(path, boundary):
     current = path
     # Include ancestors of the boundary itself (notably .local-ci).
     while True:
-        if current.exists() and (current.is_symlink() or getattr(current.lstat(), 'st_file_attributes', 0) & 0x400):
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            metadata = None
+        if current.is_symlink() or (metadata and getattr(metadata, 'st_file_attributes', 0) & 0x400):
             raise Refusal('Generated path contains a symlink/junction/reparse point.')
         if current == current.parent:
             return path
