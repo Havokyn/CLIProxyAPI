@@ -68,8 +68,8 @@ Then run from the original repository:
 
 Verify runs **Fast**, then **Full**, each without exclusions, and checks their
 actual complete, clean, exact-SHA reports. Both include build, secret scan and
-reset-aware regressions. Full covers all Go packages. A further deterministic
-Claude/session/executor rerun proves cold weekly exclusion, exhausted-affinity
+reset-aware regressions. Full covers all Go packages. A named deterministic
+Claude/session/executor gate inside the locked CI snapshot proves cold weekly exclusion, exhausted-affinity
 failover, healthy stickiness, capacity rejection/refresh, namespace invalidation
 and no ambiguous replay. Reports bind gates, candidate SHA/tree and binary hash.
 Any candidate change invalidates previous evidence. A failed gate stops the process.

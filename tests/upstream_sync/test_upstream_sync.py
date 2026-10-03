@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -21,11 +22,15 @@ class SyncTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / 'repo'
         self.root.mkdir()
+        self.environment = patch.dict(os.environ, dict(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1'))
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
         self.run_git('init', '-b', 'main')
         self.run_git('config', 'user.name', 'Fixture')
         self.run_git('config', 'user.email', 'fixture@example.invalid')
         self.run_git('config', 'core.autocrlf', 'false')
         self.run_git('config', 'commit.gpgsign', 'false')
+        self.run_git('config', 'core.hooksPath', str(self.root / 'no-hooks'))
         (self.root / '.gitignore').write_text('.local-ci/\n.worktrees/\n')
         for name in ('tools/havok-ci.ps1', 'tools/local_ci.py', 'ops/havok-fleet/check-secret-safety.py'):
             path = self.root / name
@@ -166,7 +171,7 @@ class SyncTests(unittest.TestCase):
         text = (SOURCE / 'tools/upstream_sync.py').read_text()
         for forbidden in ('--force', '--hard', "'clean'", "'rebase'", "'stash'", "'--ours'", "'--theirs'"):
             self.assertNotIn(forbidden, text)
-        self.assertIn("'push', 'origin'", text)
+        self.assertIn("'push', '--no-follow-tags', 'origin'", text)
         self.assertIn("'--repo', FORK", text)
 
     def test_actions_not_required_and_gate_binding(self):
@@ -175,6 +180,68 @@ class SyncTests(unittest.TestCase):
         self.assertNotIn('required_status_checks', text)
         self.assertIn("check.get('sha') != sha", text)
         self.assertIn("ci.get('dirty')", text)
+
+    def test_fetch_ignores_dangerous_configured_refspec(self):
+        remote = Path(self.temp.name) / 'remote'
+        subprocess.run(['git', 'clone', '--bare', str(self.root), str(remote)], check=True, capture_output=True)
+        self.run_git('config', 'remote.upstream.fetch', '+refs/heads/main:refs/heads/main')
+        self.run_git('remote', 'set-url', 'upstream', str(remote))
+        self.run_git('switch', '-c', 'feature')
+        before = sync.value(self.root, 'rev-parse', 'main')
+        sync.fetch_main(self.root, 'upstream')
+        self.assertEqual(sync.value(self.root, 'rev-parse', 'main'), before)
+
+    def test_candidate_scan_includes_unscoped_files(self):
+        self.commit('test-only credential fixture', 'sdk/unscoped.txt', 'api_key=abcdefghijk\n')
+        # Use the real scanner while keeping fixture repositories offline.
+        import shutil
+        shutil.copyfile(SOURCE / 'ops/havok-fleet/check-secret-safety.py', self.root / 'ops/havok-fleet/check-secret-safety.py')
+        self.run_git('add', '.')
+        self.run_git('commit', '-m', 'scanner')
+        findings, unresolved = sync.scan_candidate(self.root, dict(havok_sha=self.base))
+        self.assertTrue(any(item['file'] == 'sdk/unscoped.txt' for item in unresolved))
+        self.assertTrue(findings)
+
+    def test_verify_selects_windows_report_and_binds_all_gates(self):
+        data = dict(havok_sha=self.base, upstream_sha=self.base, review_pass=True,
+                    reviewed_tree=sync.value(self.root, 'rev-parse', 'HEAD^{tree}'), branch='sync/upstream-20261003-12345678')
+        directory = self.root / '.local-ci/upstream-sync/verify'
+        sha = sync.value(self.root, 'rev-parse', 'HEAD')
+        def fake_command(args, cwd, **kwargs):
+            mode = args[-1][1:].lower()
+            for stamp, report_mode in ((mode + '-1', mode), (mode + '-2', 'linux')):
+                out = self.root / '.local-ci/results' / stamp
+                out.mkdir(parents=True)
+                ci = dict(mode=report_mode, result='PASS', complete=True, dirty=False, git_sha=sha,
+                          checks=[dict(name=name, result='PASS') for name in
+                                  ('Go Build', 'Reset-Aware Tests', 'Secret Safety', 'Claude Failover Tests')])
+                (out / 'summary.json').write_text(json.dumps(ci))
+                (out / 'cli-proxy-api.exe').write_bytes(b'fixture binary')
+            return subprocess.CompletedProcess(args, 0, '', '')
+        with patch.object(sync, 'prerequisites'), patch.object(sync, 'scan_candidate', return_value=([], [])), \
+                patch.object(sync, 'command', side_effect=fake_command):
+            # candidate() and diff use real Git; avoid intercepting their subprocesses.
+            with patch.object(sync, 'candidate', return_value=(sha, data['reviewed_tree'])), patch.object(sync, 'git'):
+                result = sync.verify(self.root, directory, data, self.root)
+        self.assertEqual(result['state'], 'PR_READY')
+        self.assertEqual(result['gates']['fast']['sha'], sha)
+        self.assertEqual(result['gates']['claude_regressions']['result'], 'PASS')
+        self.assertIn('fast-1', result['gates']['fast']['evidence'])
+
+    def test_pr_rejects_stale_candidate_before_push(self):
+        with patch.object(sync, 'prerequisites'), patch.object(sync, 'candidate', return_value=('new', 'new-tree')), \
+                patch.object(sync, 'command') as command:
+            with self.assertRaisesRegex(sync.Refusal, 'changed'):
+                sync.create_pr(self.root, self.root, dict(candidate_sha='old'), self.root)
+        command.assert_not_called()
+
+    def test_pr_rejects_missing_full_gate_before_push(self):
+        data = dict(candidate_sha='sha', candidate_tree='tree', reviewed_tree='tree', review_pass=True, gates={})
+        with patch.object(sync, 'prerequisites'), patch.object(sync, 'candidate', return_value=('sha', 'tree')), \
+                patch.object(sync, 'command') as command:
+            with self.assertRaisesRegex(sync.Refusal, 'PASS'):
+                sync.create_pr(self.root, self.root, data, self.root)
+        command.assert_not_called()
 
 
 if __name__ == '__main__':

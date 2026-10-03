@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -26,12 +27,13 @@ class Refusal(RuntimeError):
     pass
 
 
-def command(args, cwd, *, allow_failure=False):
+def command(args, cwd, *, allow_failure=False, extra_env=None):
     env = os.environ.copy()
     for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
                 'GIT_PREFIX', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
                 'GIT_CONFIG_PARAMETERS'):
         env.pop(key, None)
+    env.update(extra_env or {})
     result = subprocess.run(args, cwd=cwd, env=env, capture_output=True,
                             text=True, encoding='utf-8', errors='replace')
     if result.returncode and not allow_failure:
@@ -125,8 +127,8 @@ def safe_text(text):
 def status(root, fetch=True):
     identity(root)
     if fetch:
-        git(root, 'fetch', 'origin')
-        git(root, 'fetch', 'upstream')
+        fetch_main(root, 'origin')
+        fetch_main(root, 'upstream')
     havok = value(root, 'rev-parse', 'origin/main')
     upstream = value(root, 'rev-parse', 'upstream/main')
     base = value(root, 'merge-base', havok, upstream)
@@ -157,12 +159,18 @@ def prerequisites(root, fix=False, owned=None):
     for relative in ('tools/havok-ci.ps1', 'tools/local_ci.py', 'ops/havok-fleet/check-secret-safety.py'):
         if not (root / relative).is_file():
             raise Refusal('Required local CI tooling is missing.')
-    git(root, 'fetch', 'origin')
-    git(root, 'fetch', 'upstream')
+    fetch_main(root, 'origin')
+    fetch_main(root, 'upstream')
     if value(root, 'rev-parse', 'main') != value(root, 'rev-parse', 'origin/main'):
         raise Refusal('Local main differs from origin/main. Reconcile main explicitly before syncing.')
     if git(root, 'merge-base', '--is-ancestor', BASELINE, 'origin/main', allow_failure=True).returncode:
         raise Refusal('Havok main does not contain the required Claude failover baseline.')
+
+
+def fetch_main(root, remote):
+    # Ignore configured fetch/refmap destinations, which could target local main.
+    git(root, 'fetch', '--no-tags', '--refmap=', remote,
+        f'+refs/heads/main:refs/remotes/{remote}/main')
 
 
 def contained(path, boundary):
@@ -171,13 +179,18 @@ def contained(path, boundary):
     if not path.is_relative_to(boundary):
         raise Refusal('Generated path escapes its boundary.')
     current = path
-    while current != boundary.parent:
+    # Include ancestors of the boundary itself (notably .local-ci).
+    while True:
         if current.exists() and (current.is_symlink() or getattr(current.lstat(), 'st_file_attributes', 0) & 0x400):
             raise Refusal('Generated path contains a symlink/junction/reparse point.')
-        if current == boundary:
+        if current == current.parent:
             return path
         current = current.parent
-    raise Refusal('Invalid path boundary.')
+
+
+def write_text(path, text):
+    contained(path, ROOT)
+    path.write_text(safe_text(text), encoding='utf-8')
 
 
 def write_report(directory, data):
@@ -185,7 +198,8 @@ def write_report(directory, data):
     directory.mkdir(parents=True, exist_ok=True)
     text = safe_text(json.dumps(data, indent=2)) + '\n'
     temp = directory / 'status.tmp'
-    temp.write_text(text, encoding='utf-8')
+    write_text(temp, text)
+    contained(directory / 'status.json', ROOT)
     temp.replace(directory / 'status.json')
     summary = '# Havok upstream reconciliation\n\n' + '\n'.join(
         f'- {key}: {data.get(key, "NOT_RUN")}' for key in
@@ -194,7 +208,7 @@ def write_report(directory, data):
     summary += '\n\n## Overlap / conflict review\n\n' + json.dumps(data.get('overlap', []), indent=2)
     summary += '\n\n## Decisions\n\n' + json.dumps(data.get('decisions', []), indent=2)
     summary += '\n\n## Risks\n\n' + '\n'.join(data.get('remaining_risks', [])) + '\n'
-    (directory / 'summary.md').write_text(safe_text(summary), encoding='utf-8')
+    write_text(directory / 'summary.md', summary)
 
 
 def prepare(root, data):
@@ -234,7 +248,8 @@ def load_report(root, report):
         if len(candidates) != 1:
             raise Refusal('Specify -Report pointing to the exact sync report directory.')
         report = candidates[0].parent
-    directory = contained(Path(report).resolve(), root / '.local-ci/upstream-sync')
+    directory = contained(Path(report).absolute(), root / '.local-ci/upstream-sync')
+    contained(directory / 'status.json', root)
     data = json.loads((directory / 'status.json').read_text(encoding='utf-8'))
     if data.get('repository') != str(root) or data.get('report') != str(directory) or not BRANCH.fullmatch(data.get('branch', '')):
         raise Refusal('Report ownership/branch does not match this repository.')
@@ -254,28 +269,56 @@ def candidate(worktree, data):
     return sha, tree
 
 
+def scan_candidate(worktree, data):
+    spec = importlib.util.spec_from_file_location('sync_scanner', worktree / 'ops/havok-fleet/check-secret-safety.py')
+    scanner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(scanner)
+    findings = []
+    paths = git(worktree, 'diff', '--name-only', '--diff-filter=ACMR', '-z', data['havok_sha'], 'HEAD').stdout.split('\0')
+    for path in filter(None, paths):
+        raw = git(worktree, 'show', 'HEAD:' + path).stdout
+        if '\0' in raw:
+            continue
+        digest = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+        for line, rule in scanner.scan_text(raw, go_source=path.endswith('.go')):
+            findings.append(dict(file=path, line=line, rule=rule, blob_sha256=digest))
+    reviewed = data.get('secret_false_positives', [])
+    unresolved = [item for item in findings if item not in reviewed]
+    return findings, unresolved
+
+
 def verify(root, directory, data, worktree):
     prerequisites(root, owned=worktree)
     sha, tree = candidate(worktree, data)
     if not data.get('review_pass') or data.get('reviewed_tree') != tree:
         raise Refusal('Set review_pass=true, reviewed_tree=<candidate tree> and decisions after semantic review in status.json.')
     data.update(state='VERIFYING', candidate_sha=sha, candidate_tree=tree, gates={})
+    findings, unresolved = scan_candidate(worktree, data)
+    data['secret_findings'] = findings
+    data['gates']['candidate_secret_scan'] = dict(result='FAIL' if unresolved else 'PASS', sha=sha)
     write_report(directory, data)
+    if unresolved:
+        raise Refusal('Candidate blob secret scan has findings. Review sanitized file/line/rule report; only demonstrable fixture false positives may be explicitly recorded.')
     runner = shutil.which('pwsh') or shutil.which('powershell')
     if not runner:
         raise Refusal('PowerShell is required for local CI.')
     for mode in ('Fast', 'Full'):
+        before = set((worktree / '.local-ci/results').glob('*/summary.json'))
         result = command([runner, '-NoProfile', '-File', str(worktree / 'tools/havok-ci.ps1'), '-' + mode],
                          worktree, allow_failure=True)
-        (directory / (mode.lower() + '.log')).write_text(safe_text(result.stdout + result.stderr), encoding='utf-8')
-        summaries = sorted((worktree / '.local-ci/results').glob('*/summary.json'))
+        write_text(directory / (mode.lower() + '.log'), result.stdout + result.stderr)
+        summaries = [path for path in (worktree / '.local-ci/results').glob('*/summary.json')
+                     if path not in before and json.loads(path.read_text()).get('mode') == mode.lower()]
+        if len(summaries) > 1:
+            raise Refusal('Multiple local CI runs appeared; cannot bind evidence unambiguously.')
         ci = json.loads(summaries[-1].read_text()) if summaries else {}
         passed = (result.returncode == 0 and ci.get('result') == 'PASS' and ci.get('complete') is True
                   and ci.get('git_sha') == sha and ci.get('dirty') is False and ci.get('mode') == mode.lower())
         data['gates'][mode.lower()] = dict(result='PASS' if passed else 'FAIL', sha=sha,
                                             evidence=str(summaries[-1]) if summaries else None)
         if passed:
-            for name, key in (('Go Build', 'build'), ('Reset-Aware Tests', 'reset_aware'), ('Secret Safety', 'secret_scan')):
+            for name, key in (('Go Build', 'build'), ('Reset-Aware Tests', 'reset_aware'), ('Secret Safety', 'secret_scan'),
+                              ('Claude Failover Tests', 'claude_regressions')):
                 checks = [item for item in ci['checks'] if item['name'] == name]
                 data['gates'][key] = dict(result=checks[0]['result'] if checks else 'FAIL', sha=sha)
             build = summaries[-1].parent / 'cli-proxy-api.exe'
@@ -285,22 +328,13 @@ def verify(root, directory, data, worktree):
         if not passed:
             raise Refusal(f'{mode} local CI failed/incomplete. Inspect sanitized sync log and CI summary.')
     git(worktree, 'diff', '--check')
-    # Full CI includes executor, session and ambiguity tests. A named focused rerun
-    # supplies explicit Claude fix proof instead of inferring it from a broad pass.
-    go = shutil.which('go') or r'C:\Program Files\Go\bin\go.exe'
-    source = worktree / '.local-ci/source'
-    result = command([go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth',
-                      './sdk/cliproxy/session', './internal/runtime/executor', '-run',
-                      'Test(Claude|MerklePrefixMatcherInvalidate|AuthManager_ConcurrentSuccess)'], source,
-                     allow_failure=True)
-    (directory / 'claude-regressions.log').write_text(safe_text(result.stdout + result.stderr), encoding='utf-8')
-    data['gates']['claude_regressions'] = dict(result='PASS' if result.returncode == 0 else 'FAIL', sha=sha)
+    # Named Claude proof runs inside CI's locked snapshot and offline environment.
     end_sha, end_tree = candidate(worktree, data)
     if (end_sha, end_tree) != (sha, tree):
         raise Refusal('Candidate changed during verification. Rerun all gates.')
-    data['state'] = 'PR_READY' if result.returncode == 0 else 'REGRESSION_FAILED'
+    data['state'] = 'PR_READY' if data['gates']['claude_regressions']['result'] == 'PASS' else 'REGRESSION_FAILED'
     write_report(directory, data)
-    if result.returncode:
+    if data['state'] != 'PR_READY':
         raise Refusal('Claude deterministic regression proof failed.')
     return data
 
@@ -310,15 +344,18 @@ def create_pr(root, directory, data, worktree):
     sha, tree = candidate(worktree, data)
     if data.get('candidate_sha') != sha or data.get('candidate_tree') != tree or data.get('reviewed_tree') != tree or not data.get('review_pass'):
         raise Refusal('Candidate/review changed. Rerun verification.')
-    for gate in ('fast', 'full', 'build', 'reset_aware', 'secret_scan', 'claude_regressions'):
+    for gate in ('fast', 'full', 'build', 'reset_aware', 'secret_scan', 'candidate_secret_scan', 'claude_regressions'):
         check = data.get('gates', {}).get(gate, {})
         if check.get('result') != 'PASS' or check.get('sha') != sha:
             raise Refusal('All exact-candidate local gates must PASS before pushing.')
     # Read the real reports again, not only the editable sync summary.
     for mode in ('fast', 'full'):
-        ci = json.loads(Path(data['gates'][mode]['evidence']).read_text())
+        evidence = contained(Path(data['gates'][mode]['evidence']), worktree / '.local-ci/results')
+        ci = json.loads(evidence.read_text())
         if ci.get('git_sha') != sha or ci.get('dirty') or ci.get('result') != 'PASS' or not ci.get('complete') or ci.get('mode') != mode:
             raise Refusal('Local CI evidence is stale or incomplete.')
+    if scan_candidate(worktree, data)[1]:
+        raise Refusal('Candidate secret scan no longer passes.')
     if data['havok_sha'] != value(root, 'rev-parse', 'origin/main'):
         raise Refusal('origin/main advanced. Reconcile and reverify before creating a PR.')
     enabled = command(['gh', 'api', f'repos/{FORK}/actions/permissions', '--jq', '.enabled'], root).stdout.strip()
@@ -330,10 +367,10 @@ def create_pr(root, directory, data, worktree):
     body += '\n\nReconciliation decisions:\n' + '\n'.join('- ' + str(item) for item in data.get('decisions', []))
     body += f'\n\nCandidate: {sha}\nTree: {tree}\n\nFast PASS; Full PASS; build PASS; reset-aware PASS; Claude deterministic regressions PASS; secret scan PASS.\nNo GitHub Actions required. No upstream push. Live deployment proof is recorded separately before merge.\n'
     path = directory / 'pr-body.md'
-    path.write_text(safe_text(body), encoding='utf-8')
+    write_text(path, body)
     # Explicit destination and refspec; regular push rejects non-fast-forward updates.
     git(worktree, '-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential',
-        'push', 'origin', f"HEAD:refs/heads/{data['branch']}")
+        'push', '--no-follow-tags', 'origin', f"HEAD:refs/heads/{data['branch']}")
     existing = command(['gh', 'pr', 'list', '--repo', FORK, '--head', data['branch'], '--base', 'main',
                         '--json', 'url'], root).stdout
     urls = json.loads(existing)
