@@ -17,6 +17,38 @@ type quotaFetchTestExecutor struct {
 	fetchContext func(context.Context) (http.Header, error)
 }
 
+func TestQuotaCredentialCapacityFailureRefreshesWithoutClearingCooldown(t *testing.T) {
+	manager := NewManager(nil, nil, nil)
+	auth, errRegister := manager.Register(context.Background(), &Auth{ID: "capacity", Provider: "codex", Status: StatusActive})
+	if errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	exec := &quotaFetchTestExecutor{schedulerTestExecutor: schedulerTestExecutor{provider: "codex"}, fetch: func() (http.Header, error) {
+		close(started)
+		<-release
+		return http.Header{"X-Codex-Primary-Used-Percent": {"100"}, "X-Codex-Primary-Window-Minutes": {"300"}, "X-Codex-Primary-Reset-After-Seconds": {"120"}}, nil
+	}}
+	manager.RegisterExecutor(exec)
+	retry := 2 * time.Minute
+	manager.MarkResult(context.Background(), Result{AuthID: auth.ID, Provider: "codex", Model: "model", CredentialScope: true, Error: &Error{HTTPStatus: 429, Code: "usage_limit_reached"}, RetryAfter: &retry})
+	<-started
+	cooled, _ := manager.GetByID(auth.ID)
+	if !cooled.Quota.Exceeded || cooled.Quota.Reason != "credential_quota" || !cooled.Unavailable {
+		t.Fatal("capacity failure did not cool credential")
+	}
+	close(release)
+	value, _ := manager.quotaProbeStates.Load(auth.ID)
+	state := value.(*quotaProbeState)
+	state.mu.Lock()
+	state.mu.Unlock()
+	observed, _ := manager.GetByID(auth.ID)
+	if len(observed.Quota.Windows) == 0 || !observed.Quota.Exceeded || !observed.Quota.NextRecoverAt.Equal(cooled.Quota.NextRecoverAt) {
+		t.Fatal("refresh lost capacity observation or active cooldown")
+	}
+}
+
 func (e *quotaFetchTestExecutor) FetchQuotaHeaders(ctx context.Context, _ *Auth) (http.Header, error) {
 	e.calls.Add(1)
 	if e.fetchContext != nil {
@@ -162,7 +194,7 @@ func TestQuotaRoutingRefreshDoesNotWaitForProvider(t *testing.T) {
 
 func TestQuotaRefreshCredentialChangeInvalidatesProbeBackoff(t *testing.T) {
 	manager := NewManager(nil, nil, nil)
-	auth, _ := manager.Register(context.Background(), &Auth{ID: "a", Provider: "codex", Status: StatusActive, Metadata: map[string]any{"access_token": "synthetic-old"}})
+	auth, _ := manager.Register(context.Background(), &Auth{ID: "a", Provider: "codex", Status: StatusActive, Metadata: map[string]any{"access_token": "test-only-old"}})
 	exec := &quotaFetchTestExecutor{schedulerTestExecutor: schedulerTestExecutor{provider: "codex"}, fetch: func() (http.Header, error) {
 		return http.Header{"X-Codex-Primary-Used-Percent": {"73"}, "X-Codex-Primary-Window-Minutes": {"10080"}, "X-Codex-Primary-Reset-After-Seconds": {"3600"}}, nil
 	}}

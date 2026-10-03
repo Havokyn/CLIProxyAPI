@@ -28,7 +28,7 @@ func (h *Handler) RefreshRoutingQuota(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
 		return
 	}
-	if !strings.EqualFold(auth.Provider, "codex") {
+	if !strings.EqualFold(auth.Provider, "codex") && !strings.EqualFold(auth.Provider, "claude") {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "native quota refresh unsupported for provider"})
 		return
 	}

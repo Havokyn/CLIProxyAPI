@@ -10,6 +10,7 @@ param(
     [string]$PiConfigPath = (Join-Path $HOME '.pi/agent/models.json'),
     [string]$PromptFile,
     [switch]$DryRun,
+    [switch]$ProxyMode,
     [Parameter(ValueFromRemainingArguments)][string[]]$ClientArgs
 )
 
@@ -62,15 +63,19 @@ function Write-ClientConfig([string]$Path, [string]$Content) {
 
 if ($Executable) { $exe = $Executable }
 $command = Get-Command $exe -ErrorAction Stop | Select-Object -First 1
-$environmentNames = @('CLIPROXY_API_KEY', 'CODEX_HOME', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENAI_BASE_URL')
+$environmentNames = @('CLIPROXY_API_KEY', 'CODEX_HOME', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENAI_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY')
 $saved = @{}
 foreach ($name in $environmentNames) { $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 try {
 
 Set-Item -Path "Env:$envName" -Value $key
 switch ($Client) {
-    'claude' { $env:ANTHROPIC_BASE_URL = $Endpoint; $env:ANTHROPIC_AUTH_TOKEN = $key; Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue }
+    'claude' {
+        $env:ANTHROPIC_BASE_URL = $Endpoint; $env:ANTHROPIC_AUTH_TOKEN = $key; Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+        if ($ProxyMode) { Remove-Item Env:CLAUDE_CODE_OAUTH_TOKEN,Env:CLAUDE_CODE_USE_BEDROCK,Env:CLAUDE_CODE_USE_VERTEX,Env:CLAUDE_CODE_USE_FOUNDRY -ErrorAction SilentlyContinue }
+    }
     'pi' {
+        if ($ProxyMode) { $env:CLIPROXY_API_KEY = $key; break }
         try { $data = if (Test-Path -LiteralPath $PiConfigPath) { Get-Content -LiteralPath $PiConfigPath -Raw | ConvertFrom-Json -AsHashtable } else { @{} } }
         catch { throw 'Existing Pi models configuration is invalid; left unchanged.' }
         if (-not $data.ContainsKey('providers')) { $data.providers = @{} }
@@ -84,6 +89,7 @@ switch ($Client) {
         $env:CLIPROXY_API_KEY = $key
     }
     'codex' {
+        if ($ProxyMode) { break }
         $provider = @"
 [model_providers.cliproxy]
 name = "CLIProxyAPI"
@@ -99,9 +105,11 @@ requires_openai_auth = false
     }
 }
 if ($Client -eq 'codex') {
-    & $command.Source --no-daemon --profile $codexProfile --model $Model @ClientArgs
+    if ($ProxyMode) { & $command.Source --no-daemon @ClientArgs --profile $codexProfile }
+    else { & $command.Source --no-daemon --profile $codexProfile --model $Model @ClientArgs }
 } elseif ($Client -eq 'pi') {
-    & $command.Source --model "cliproxy/$Model" @ClientArgs
+    if ($ProxyMode) { & $command.Source @ClientArgs --provider cliproxy --model "cliproxy/$Model" }
+    else { & $command.Source --model "cliproxy/$Model" @ClientArgs }
 } else {
     $arguments = @()
     if ($Model) { $arguments += @('--model', $Model) }

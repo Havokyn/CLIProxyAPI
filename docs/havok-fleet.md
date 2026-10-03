@@ -204,3 +204,10 @@ CI self-tests exercise a temporary command exiting 23 (report FAIL and nonzero),
 
 
 Go runs against `.local-ci/source`, an isolated mirror of tracked and nonignored working files, including unstaged changes and new nonignored source. This avoids Go recursively discovering incomplete historical backups under ignored `bin/`. Original backups and runtime files are preserved. A file-hash manifest binds the snapshot to the report; only generated files recorded in the manifest are updated/removed. Unexpected snapshot files, symlinks, Windows junctions or reparse points fail closed. A repo-local `source.lock` prevents simultaneous Go runs from rewriting the mirror. If a verifier is interrupted, inspect its process and preserve its report before removing a stale lock. Local compile artifacts use `-buildvcs=false` because the source mirror is not a Git checkout; the JSON SHA and source manifest provide provenance. These artifacts are verification outputs, not deployment releases.
+## Herdr orchestration mode
+
+Use `herdr` for normal mode and `herdr-proxy` for an isolated local Windows
+gateway-backed process tree. See [Herdr proxy operations](herdr-proxy.md) for
+installation, status, doctor, dry run, session isolation and capacity recovery.
+Proxy mode delegates subscription limits to CLIProxy failover rather than direct
+relogin. Remote installations are unchanged.

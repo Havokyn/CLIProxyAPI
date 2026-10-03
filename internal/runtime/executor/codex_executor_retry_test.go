@@ -269,6 +269,22 @@ func TestIsCodexUsageLimitError(t *testing.T) {
 	}
 }
 
+// The observed provider type is usage_limit_reached. Do not infer an upstream
+// HTTP status from its prose: transports can carry this rejection in several
+// envelopes, all of which must remain temporary credential capacity failures.
+func TestCodexSubscriptionSharingCapacityClassification(t *testing.T) {
+	body := []byte(`{"error":{"type":"usage_limit_reached","message":"The ChatGPT user has reached their Subscription Sharing usage limit.","resets_in_seconds":120}}`)
+	for _, upstreamStatus := range []int{400, 403, 429} {
+		err := newCodexStatusErr(upstreamStatus, body)
+		if err.StatusCode() != http.StatusTooManyRequests || !err.credentialScoped || err.RetryAfter() == nil || *err.RetryAfter() != 120*time.Second {
+			t.Fatalf("upstream status %d was not normalized to temporary credential capacity", upstreamStatus)
+		}
+	}
+	if isCodexUsageLimitError([]byte(`{"error":{"type":"authentication_error","message":"The ChatGPT user has reached their Subscription Sharing usage limit."}}`)) {
+		t.Fatal("classification must use authoritative type, not message matching")
+	}
+}
+
 func TestNewCodexStatusErrClassifiesKnownCodexFailures(t *testing.T) {
 	tests := []struct {
 		name       string

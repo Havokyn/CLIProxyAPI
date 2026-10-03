@@ -14,35 +14,56 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
-type routingQuotaTestExecutor struct{ refreshRecordExecutor }
+type routingQuotaTestExecutor struct {
+	refreshRecordExecutor
+	quotaHeaders http.Header
+}
 
 func (e *routingQuotaTestExecutor) FetchQuotaHeaders(context.Context, *coreauth.Auth) (http.Header, error) {
+	if e.quotaHeaders != nil {
+		return e.quotaHeaders, nil
+	}
 	return http.Header{"X-Codex-Primary-Used-Percent": {"73"}, "X-Codex-Primary-Window-Minutes": {"10080"}, "X-Codex-Primary-Reset-After-Seconds": {"3600"}}, nil
 }
 
 func TestRefreshRoutingQuotaWritesObservationWithoutOAuthRefresh(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	manager := coreauth.NewManager(nil, nil, nil)
-	exec := &routingQuotaTestExecutor{refreshRecordExecutor: refreshRecordExecutor{provider: "codex"}}
-	manager.RegisterExecutor(exec)
-	auth, err := manager.Register(context.Background(), &coreauth.Auth{ID: "quota-test", Provider: "codex", Status: coreauth.StatusActive})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := &Handler{authManager: manager}
-	engine := gin.New()
-	engine.POST("/refresh", h.RefreshRoutingQuota)
-	body, _ := json.Marshal(map[string]string{"auth_index": auth.Index})
-	request := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-	engine.ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
-	}
-	updated, _ := manager.GetByID(auth.ID)
-	if len(updated.Quota.Windows) != 1 || updated.Quota.Windows[0].RemainingPercent != 27 || exec.refreshCnt.Load() != 0 {
-		t.Fatalf("quota refresh mutated OAuth or lost observation: %+v", updated.Quota)
+	for _, testCase := range []struct {
+		name          string
+		provider      string
+		quotaHeaders  http.Header
+		remainingWant float64
+	}{
+		{name: "codex", provider: "codex", remainingWant: 27},
+		{name: "claude", provider: "claude", quotaHeaders: http.Header{
+			"Anthropic-Ratelimit-Unified-5h-Utilization": {"0.25"},
+			"Anthropic-Ratelimit-Unified-5h-Reset":       {"1787296800"},
+		}, remainingWant: 75},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			manager := coreauth.NewManager(nil, nil, nil)
+			exec := &routingQuotaTestExecutor{refreshRecordExecutor: refreshRecordExecutor{provider: testCase.provider}, quotaHeaders: testCase.quotaHeaders}
+			manager.RegisterExecutor(exec)
+			auth, err := manager.Register(context.Background(), &coreauth.Auth{ID: "quota-test-" + testCase.name, Provider: testCase.provider, Status: coreauth.StatusActive})
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := &Handler{authManager: manager}
+			engine := gin.New()
+			engine.POST("/refresh", h.RefreshRoutingQuota)
+			body, _ := json.Marshal(map[string]string{"auth_index": auth.Index})
+			request := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			if response.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			updated, _ := manager.GetByID(auth.ID)
+			if len(updated.Quota.Windows) != 1 || updated.Quota.Windows[0].RemainingPercent != testCase.remainingWant || exec.refreshCnt.Load() != 0 {
+				t.Fatalf("quota refresh mutated OAuth or lost observation: %+v", updated.Quota)
+			}
+		})
 	}
 }
 

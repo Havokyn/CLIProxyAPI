@@ -30,6 +30,7 @@ auths/*
 
 # Documentation
 docs/*
+!docs/herdr-proxy.md
 !docs/management-api-v8.md
 !docs/havok-fleet.md
 AGENTS.md

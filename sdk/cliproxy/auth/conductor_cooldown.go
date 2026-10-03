@@ -1054,6 +1054,13 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 	m.hook.OnResult(ctx, result)
 	m.publishErrorEvent(result, authSnapshot)
 	m.updateSessionAffinity(result)
+	// Capacity exhaustion can precede passive quota telemetry. Refresh through
+	// the same coalesced authoritative path without blocking safe failover or
+	// replacing the credential's active cooldown with an observation.
+	if authSnapshot != nil && strings.EqualFold(authSnapshot.Provider, "codex") &&
+		!result.Success && result.CredentialScope && statusCodeFromResult(result.Error) == http.StatusTooManyRequests {
+		_, _ = m.StartCredentialQuotaRefresh(ctx, authSnapshot)
+	}
 }
 
 func (m *Manager) updateSessionAffinity(result Result) {

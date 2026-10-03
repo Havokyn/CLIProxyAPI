@@ -330,6 +330,7 @@ def main():
     runner.check('PowerShell Syntax', [pwsh, '-NoProfile', '-File', 'tools/check-powershell.ps1'])
     runner.check('PowerShell Launchers', [pwsh, '-NoProfile', '-File', 'tests/fleet/test-powershell-launchers.ps1'])
     runner.check('Fleet DryRun', [pwsh, '-NoProfile', '-File', 'tests/local_ci/test-fleet-dry-runs.ps1'])
+    runner.check('Herdr Proxy Runtime', [pwsh, '-NoProfile', '-File', 'tests/fleet/test-herdr-proxy.ps1'])
     source = ROOT / '.local-ci/source'
     can_go = all(c['result'] == 'PASS' for c in runner.checks if c['name'] in ('Repository', 'Secret Safety'))
     if can_go:

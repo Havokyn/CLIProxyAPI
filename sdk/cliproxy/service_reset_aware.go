@@ -33,7 +33,7 @@ func (s *Service) refreshResetAwareQuota(ctx context.Context, auth *coreauth.Aut
 		ctx = context.Background()
 	}
 	provider := strings.TrimSpace(auth.Provider)
-	if strings.EqualFold(provider, "codex") {
+	if strings.EqualFold(provider, "codex") || strings.EqualFold(provider, "claude") {
 		return s.coreManager.StartCredentialQuotaRefresh(ctx, auth)
 	}
 	if s.pluginHost == nil {

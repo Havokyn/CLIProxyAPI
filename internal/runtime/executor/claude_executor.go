@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -252,6 +253,39 @@ func (e *ClaudeExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Aut
 	}
 	httpClient := helps.NewUtlsHTTPClient(ctx, e.cfg, auth, 0)
 	return httpClient.Do(httpReq)
+}
+
+// FetchQuotaHeaders reads Claude OAuth usage without issuing an inference
+// request. The endpoint and headers mirror the Claude CLI/CPAMC usage probe.
+func (e *ClaudeExecutor) FetchQuotaHeaders(ctx context.Context, auth *cliproxyauth.Auth) (http.Header, error) {
+	if e == nil || auth == nil || auth.AuthKind() != cliproxyauth.AuthKindOAuth {
+		return nil, fmt.Errorf("Claude OAuth quota is unavailable")
+	}
+	request, errRequest := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.anthropic.com/api/oauth/usage", nil)
+	if errRequest != nil {
+		return nil, fmt.Errorf("cannot create Claude quota request")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("User-Agent", "claude-cli/2.1.280 (external, cli)")
+	request.Header.Set("anthropic-beta", "oauth-2025-04-20")
+	response, errResponse := e.HttpRequest(ctx, auth, request)
+	if errResponse != nil {
+		return nil, fmt.Errorf("Claude quota transport failed")
+	}
+	defer func() {
+		if errClose := response.Body.Close(); errClose != nil {
+			log.Debug("Claude quota response close failed")
+		}
+	}()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("Claude quota HTTP %d", response.StatusCode)
+	}
+	const maxQuotaBody = 1024 * 1024
+	payload, errRead := io.ReadAll(io.LimitReader(response.Body, maxQuotaBody+1))
+	if errRead != nil || len(payload) > maxQuotaBody {
+		return nil, fmt.Errorf("Claude quota response unreadable or oversized")
+	}
+	return helps.ParseClaudeUsageHeaders(payload)
 }
 
 // SupportsApplyPatch reports the actual executor contract, independent of its provider name.

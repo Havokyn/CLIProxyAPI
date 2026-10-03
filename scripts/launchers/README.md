@@ -1,5 +1,9 @@
 # Opt-in CLIProxyAPI launchers
 
+`windows/herdr-proxy.ps1` is the top-level local Windows orchestration launcher.
+Install its command with `tools/install-herdr-proxy.ps1`; see
+[Herdr proxy operations](../../docs/herdr-proxy.md). Ordinary `herdr` is unchanged.
+
 See the [fleet operator guide](../../docs/havok-fleet.md) for complete setup and credential provisioning.
 
 Windows entry points live in `windows/`. Use PowerShell 7.4+ and keep their repository-relative common helper available. Parameters include `-Endpoint` (origin, default `http://127.0.0.1:8317`), `-Model`, `-KeyFile`, optional existing `-CredentialsJson`, `-Executable`, and `-DryRun`. Dry runs print an operation plan without reading credentials, connecting, launching, or writing configuration. Claude leaves its normal model default intact unless explicitly supplied. Codex uses an isolated `-ProfileHome`; Pi uses `-PiConfigPath`. The launchers preserve inherited environment values when they return.
