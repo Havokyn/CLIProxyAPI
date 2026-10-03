@@ -323,6 +323,7 @@ def main():
     runner.check('Secret Safety', [py, 'ops/havok-fleet/check-secret-safety.py', '--staged'])
     runner.check('Fleet Unit Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/fleet', '-v'], 'linux.log' if options.linux else 'windows.log')
     runner.check('CI Self Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/local_ci', '-v'])
+    runner.check('Upstream Sync Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/upstream_sync', '-v'])
     if options.linux:
         runner.check('POSIX / Bootstrap', [py, __file__, '--linux-static'], 'linux.log')
         return runner.finish()
@@ -342,6 +343,7 @@ def main():
     source_ready = runner.check('Go Source Snapshot', [py, __file__, '--prepare-source', str(source)], skip=not can_go)
     go = shutil.which('go') or r'C:\Program Files\Go\bin\go.exe'
     runner.check('Reset-Aware Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', '-run', 'Test(ResetAware|Quota|CodexQuota)'], 'go-tests.log', not source_ready, source)
+    runner.check('Claude Failover Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', './sdk/cliproxy/session', './internal/runtime/executor', '-run', 'Test(Claude|MerklePrefixMatcherInvalidate|AuthManager_ConcurrentSuccess|PublishedAuthSnapshotRace)'], 'go-tests.log', not source_ready, source)
     runner.check('Go Focused Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', './internal/config', './internal/api/handlers/management', './sdk/cliproxy'], 'go-tests.log', not source_ready, source)
     runner.check('Go Build', [go, 'build', '-buildvcs=false', '-o', str(runner.directory / 'cli-proxy-api.exe'), './cmd/server'], 'build.log', options.no_build or not source_ready, source)
     if not options.no_wsl:

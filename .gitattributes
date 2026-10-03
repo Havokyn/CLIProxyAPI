@@ -8,3 +8,4 @@ tests/fleet/* text eol=lf
 tools/* text eol=lf
 tools/git-hooks/* text eol=lf
 tests/local_ci/* text eol=lf
+tests/upstream_sync/* text eol=lf
