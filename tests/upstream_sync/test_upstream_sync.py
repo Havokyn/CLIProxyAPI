@@ -192,7 +192,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(sync.value(self.root, 'rev-parse', 'main'), before)
 
     def test_candidate_scan_includes_unscoped_files(self):
-        self.commit('test-only credential fixture', 'sdk/unscoped.txt', 'api_key=abcdefghijk\n')
+        self.commit('test-only credential fixture', 'sdk/unscoped.txt', 'api_' + 'key=' + 'abcdefghijk\n')
         # Use the real scanner while keeping fixture repositories offline.
         import shutil
         shutil.copyfile(SOURCE / 'ops/havok-fleet/check-secret-safety.py', self.root / 'ops/havok-fleet/check-secret-safety.py')
