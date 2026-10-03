@@ -161,6 +161,18 @@ class SyncTests(unittest.TestCase):
         with self.assertRaises(sync.Refusal):
             sync.contained(self.root.parent / 'escape', self.root)
 
+    def test_dangling_output_symlink_refused(self):
+        path = self.root / 'output.txt'
+        external = self.root.parent / 'must-not-create.txt'
+        try:
+            path.symlink_to(external)
+        except OSError:
+            self.skipTest('Symlink creation not permitted on this host')
+        with self.assertRaises(sync.Refusal):
+            sync.write_text(path, 'test')
+        self.assertFalse(external.exists())
+        path.unlink()
+
     def test_report_sanitization(self):
         directory = self.root / '.local-ci/upstream-sync/test'
         sync.write_report(directory, dict(decisions=['contact fixture@example.invalid'], gates={}))
@@ -184,12 +196,15 @@ class SyncTests(unittest.TestCase):
     def test_fetch_ignores_dangerous_configured_refspec(self):
         remote = Path(self.temp.name) / 'remote'
         subprocess.run(['git', 'clone', '--bare', str(self.root), str(remote)], check=True, capture_output=True)
+        self.upstream()
+        self.run_git('push', str(remote), 'fixture-upstream:main')
         self.run_git('config', 'remote.upstream.fetch', '+refs/heads/main:refs/heads/main')
         self.run_git('remote', 'set-url', 'upstream', str(remote))
         self.run_git('switch', '-c', 'feature')
         before = sync.value(self.root, 'rev-parse', 'main')
         sync.fetch_main(self.root, 'upstream')
         self.assertEqual(sync.value(self.root, 'rev-parse', 'main'), before)
+        self.assertNotEqual(sync.value(self.root, 'rev-parse', 'upstream/main'), before)
 
     def test_candidate_scan_includes_unscoped_files(self):
         self.commit('test-only credential fixture', 'sdk/unscoped.txt', 'api_' + 'key=' + 'abcdefghijk\n')
