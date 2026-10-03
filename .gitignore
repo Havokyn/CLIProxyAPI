@@ -33,6 +33,7 @@ docs/*
 !docs/herdr-proxy.md
 !docs/management-api-v8.md
 !docs/havok-fleet.md
+!docs/upstream-sync.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md

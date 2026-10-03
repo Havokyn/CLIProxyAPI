@@ -112,7 +112,7 @@ def assert_no_reparse(path, boundary):
     boundary = Path(os.path.abspath(boundary))
     if not current.is_relative_to(boundary):
         raise ValueError('Path escaped its expected boundary')
-    while current != boundary.parent:
+    while True:
         try:
             metadata = current.lstat()
         except FileNotFoundError:
@@ -122,6 +122,8 @@ def assert_no_reparse(path, boundary):
             raise ValueError('Symlink/junction/reparse point in generated or source path; operation refused')
         if current == boundary:
             return
+        if current == current.parent:
+            break
         current = current.parent
     raise ValueError('Path escaped its expected boundary')
 
@@ -204,7 +206,9 @@ class Runner:
         self.env[f'GIT_CONFIG_VALUE_{config_count}'] = ROOT.as_posix()
         self.env['GIT_CONFIG_COUNT'] = str(config_count + 1)
         self.env['GIT_OPTIONAL_LOCKS'] = '0'
-        self.env.update(GOCACHE=str(ROOT / '.local-ci/go-cache'), GOPROXY='off', GOSUMDB='off',
+        cache = Path(os.path.abspath(os.environ.get('HAVOK_CI_CACHE', ROOT / '.local-ci/go-cache')))
+        assert_no_reparse(cache, Path(cache.anchor))
+        self.env.update(GOCACHE=str(cache), GOPROXY='off', GOSUMDB='off',
                         GOTOOLCHAIN='local', GOFLAGS='-mod=readonly', PYTHONDONTWRITEBYTECODE='1')
         self.env['GOTMPDIR'] = str(ROOT / '.local-ci/go-tmp')
         Path(self.env['GOTMPDIR']).mkdir(parents=True, exist_ok=True)
@@ -323,6 +327,7 @@ def main():
     runner.check('Secret Safety', [py, 'ops/havok-fleet/check-secret-safety.py', '--staged'])
     runner.check('Fleet Unit Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/fleet', '-v'], 'linux.log' if options.linux else 'windows.log')
     runner.check('CI Self Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/local_ci', '-v'])
+    runner.check('Upstream Sync Tests', [py, '-m', 'unittest', 'discover', '-s', 'tests/upstream_sync', '-v'])
     if options.linux:
         runner.check('POSIX / Bootstrap', [py, __file__, '--linux-static'], 'linux.log')
         return runner.finish()
@@ -342,6 +347,7 @@ def main():
     source_ready = runner.check('Go Source Snapshot', [py, __file__, '--prepare-source', str(source)], skip=not can_go)
     go = shutil.which('go') or r'C:\Program Files\Go\bin\go.exe'
     runner.check('Reset-Aware Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', '-run', 'Test(ResetAware|Quota|CodexQuota)'], 'go-tests.log', not source_ready, source)
+    runner.check('Claude Failover Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', './sdk/cliproxy/session', './internal/runtime/executor', '-run', 'Test(Claude|MerklePrefixMatcherInvalidate|AuthManager_ConcurrentSuccess|PublishedAuthSnapshotRace)'], 'go-tests.log', not source_ready, source)
     runner.check('Go Focused Tests', [go, 'test', '-buildvcs=false', '-count=1', '-p', '1', './sdk/cliproxy/auth', './internal/config', './internal/api/handlers/management', './sdk/cliproxy'], 'go-tests.log', not source_ready, source)
     runner.check('Go Build', [go, 'build', '-buildvcs=false', '-o', str(runner.directory / 'cli-proxy-api.exe'), './cmd/server'], 'build.log', options.no_build or not source_ready, source)
     if not options.no_wsl:
@@ -353,7 +359,15 @@ def main():
             linux_path = translated.stdout.strip()
         except OSError:
             linux_path = '/__havok_ci_path_translation_failed__'
-        command = wsl_exec('bash', '-c', 'cd -- "$1" && sh tools/havok-ci-linux.sh', 'havok-ci', linux_path)
+        common = Path(git('rev-parse', '--git-common-dir').stdout.strip())
+        if not common.is_absolute():
+            common = ROOT / common
+        def linux_location(path):
+            path = path.resolve()
+            return '/mnt/' + path.drive[0].lower() + '/' + path.relative_to(path.anchor).as_posix()
+        command = wsl_exec('python3', linux_path + '/tools/wsl_ci_snapshot.py', linux_location(common),
+                           linux_path + '/.local-ci/source', git('rev-parse', 'HEAD').stdout.strip(),
+                           linux_location(runner.directory))
     else:
         command = wsl_exec('sh', 'tools/havok-ci-linux.sh')
     runner.check('WSL Verification', command, 'linux.log', options.no_wsl)
