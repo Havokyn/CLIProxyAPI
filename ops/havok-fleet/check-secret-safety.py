@@ -67,14 +67,54 @@ def looks_like_secret(value: str, literal: bool = False) -> bool:
     return entropy >= 3.5
 
 
-def scan_text(text: str) -> list[tuple[int, str]]:
+def go_reference_lines(text: str) -> set[int]:
+    """Recognize bare Go expression assignments, never strings or comments."""
+    references = set()
+    state = "code"
+    assignment = re.compile(r'^\s*(?:[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*|"[A-Za-z_]\w*")\s*[:=]\s*[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*,?\s*$')
+    for number, line in enumerate(text.splitlines(), 1):
+        if state == "code" and assignment.fullmatch(line):
+            references.add(number)
+        i = 0
+        while i < len(line):
+            char = line[i]
+            pair = line[i:i + 2]
+            if state == "raw":
+                if char == '`':
+                    state = "code"
+            elif state == "comment":
+                if pair == '*/':
+                    state = "code"
+                    i += 1
+            elif state in ('"', "'"):
+                if char == '\\':
+                    i += 1
+                elif char == state:
+                    state = "code"
+            elif pair == '//':
+                break
+            elif pair == '/*':
+                state = "comment"
+                i += 1
+            elif char == '`':
+                state = "raw"
+            elif char in ('"', "'"):
+                state = char
+            i += 1
+    return references
+
+
+def scan_text(text: str, *, go_source: bool = False) -> list[tuple[int, str]]:
     findings = []
+    references = go_reference_lines(text) if go_source else set()
     for line_number, line in enumerate(text.splitlines(), 1):
         if PRIVATE_KEY.search(line):
             findings.append((line_number, "private-key"))
             continue
         if TOKEN_LITERAL.search(line):
             findings.append((line_number, "token-literal"))
+            continue
+        if line_number in references:
             continue
         for rule, pattern in (("bearer", BEARER), ("credential-assignment", ASSIGNMENT), ("oauth-json", OAUTH_JSON)):
             if any(
@@ -109,7 +149,7 @@ def scan(root: Path = ROOT) -> list[tuple[str, int, str]]:
             content = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             raise OSError(f"Cannot read scoped source file: {path.relative_to(root).as_posix()}") from None
-        for line, rule in scan_text(content):
+        for line, rule in scan_text(content, go_source=path.suffix == ".go"):
             results.append((path.relative_to(root).as_posix(), line, rule))
     return results
 
@@ -130,7 +170,7 @@ def staged_findings(root: Path) -> list[tuple[str, int, str]]:
         content = raw.decode("utf-8", errors="replace")
         if b"\0" in raw and not PRIVATE_KEY.search(content):
             continue  # Binary assets; text/index files are scanned regardless of extension.
-        results.extend((relative, line, rule) for line, rule in scan_text(content))
+        results.extend((relative, line, rule) for line, rule in scan_text(content, go_source=path.suffix == ".go"))
     return results
 
 

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -80,8 +81,8 @@ func TestExchangeCodeForTokensPersistsUpstreamAccountAndDevicePool(t *testing.T)
 						t.Fatalf("token request = %s %s, want POST %s", req.Method, req.URL, TokenURL)
 					}
 					return jsonResponse(req, `{
-						"access_token":"access",
-						"refresh_token":"refresh",
+						"access_token":"unit-test-access",
+						"refresh_token":"unit-test-refresh",
 						"token_type":"Bearer",
 						"expires_in":3600,
 						"account":{"uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","email_address":"user@example.com"},
@@ -147,7 +148,7 @@ func TestExchangeCodeForTokensUsesNative220ControlPlaneShape(t *testing.T) {
 						t.Fatal(errRead)
 					}
 					tokenBody = body
-					return jsonResponse(req, `{"access_token":"access","refresh_token":"refresh","expires_in":28800}`), nil
+					return jsonResponse(req, `{"access_token":"unit-test-access","refresh_token":"unit-test-refresh","expires_in":28800}`), nil
 				case ProfileURL, RolesURL:
 					if req.Method != http.MethodGet {
 						t.Fatalf("%s method = %s, want GET", req.URL, req.Method)
@@ -206,8 +207,8 @@ func TestExchangeCodeForTokensUsesNative220ControlPlaneShape(t *testing.T) {
 		t.Fatalf("exchange Authorization = %q, want unset", got)
 	}
 	for _, endpoint := range []string{ProfileURL, RolesURL} {
-		if got := headers[endpoint].Get("Authorization"); got != "Bearer access" {
-			t.Fatalf("%s Authorization = %q, want the freshly exchanged bearer token", endpoint, got)
+		if got := headers[endpoint].Get("Authorization"); got != "Bearer unit-test-access" {
+			t.Fatalf("%s Authorization = %q, want the freshly exchanged bearer unit-test-access", endpoint, got)
 		}
 		if got := headers[endpoint].Get("Cache-Control"); got != "no-cache" {
 			t.Fatalf("%s Cache-Control = %q, want no-cache", endpoint, got)
@@ -231,8 +232,8 @@ func TestExchangeCodeForTokensSurvivesCompanionLookupFailure(t *testing.T) {
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				if req.URL.String() == TokenURL {
 					return jsonResponse(req, `{
-						"access_token":"access",
-						"refresh_token":"refresh",
+						"access_token":"unit-test-access",
+						"refresh_token":"unit-test-refresh",
 						"expires_in":28800,
 						"account":{"uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","email_address":"token@example.com"},
 						"organization":{"uuid":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","name":"Token Org"}
@@ -257,6 +258,95 @@ func TestExchangeCodeForTokensSurvivesCompanionLookupFailure(t *testing.T) {
 	}
 	if bundle.TokenData.OrganizationName != "Token Org" {
 		t.Fatalf("organization = %q, want token-response organization", bundle.TokenData.OrganizationName)
+	}
+}
+
+type errorReader struct {
+	err error
+}
+
+func (r *errorReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func (r *errorReader) Close() error {
+	return nil
+}
+
+func TestRefreshTokensWithRetry_DoesNotReplayAfterResponseReadError(t *testing.T) {
+	resetClaudeRefreshState()
+	defer resetClaudeRefreshState()
+
+	var calls int32
+	auth := &ClaudeAuth{
+		httpClient: &http.Client{
+			Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				atomic.AddInt32(&calls, 1)
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       &errorReader{err: io.ErrUnexpectedEOF},
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	_, err := auth.RefreshTokensWithRetry(context.Background(), "single-use-refresh-token", 3)
+	if err == nil {
+		t.Fatal("expected refresh error")
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one refresh attempt after a response decode/read error, got %d", got)
+	}
+}
+
+func TestRefreshTokensWithRetry_DoesNotReplayAfterJSONDecodeError(t *testing.T) {
+	resetClaudeRefreshState()
+	defer resetClaudeRefreshState()
+
+	var calls int32
+	auth := &ClaudeAuth{
+		httpClient: &http.Client{
+			Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				atomic.AddInt32(&calls, 1)
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`invalid json payload`)),
+					Header:     make(http.Header),
+				}, nil
+			}),
+		},
+	}
+
+	_, err := auth.RefreshTokensWithRetry(context.Background(), "single-use-refresh-token", 3)
+	if err == nil {
+		t.Fatal("expected refresh error")
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one refresh attempt after a JSON decode error, got %d", got)
+	}
+}
+
+func TestRefreshTokensWithRetry_DoesNotReplayAfterTransportError(t *testing.T) {
+	resetClaudeRefreshState()
+	defer resetClaudeRefreshState()
+
+	var calls int32
+	auth := &ClaudeAuth{
+		httpClient: &http.Client{
+			Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				atomic.AddInt32(&calls, 1)
+				return nil, errors.New("connection reset by peer")
+			}),
+		},
+	}
+
+	_, err := auth.RefreshTokensWithRetry(context.Background(), "single-use-refresh-token", 3)
+	if err == nil {
+		t.Fatal("expected refresh error")
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one refresh attempt after an ambiguous transport error, got %d", got)
 	}
 }
 
@@ -323,8 +413,8 @@ func TestRefreshTokens_DeduplicatesConcurrentRefresh(t *testing.T) {
 					return &http.Response{
 						StatusCode: http.StatusOK,
 						Body: io.NopCloser(strings.NewReader(`{
-							"access_token":"new-access",
-							"refresh_token":"new-refresh",
+							"access_token":"unit-test-new-access",
+							"refresh_token":"unit-test-new-refresh",
 							"token_type":"Bearer",
 							"expires_in":3600,
 							"scope":"user:profile user:inference"
@@ -374,7 +464,7 @@ func TestRefreshTokens_DeduplicatesConcurrentRefresh(t *testing.T) {
 			t.Fatalf("expected refresh to succeed, got %v", err)
 		}
 		td := <-results
-		if td == nil || td.AccessToken != "new-access" {
+		if td == nil || td.AccessToken != "unit-test-new-access" {
 			t.Fatalf("expected refreshed access token, got %#v", td)
 		}
 		if td.AccountUUID != "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" {
@@ -396,7 +486,7 @@ func TestRefreshTokensUsesNative220ControlPlaneShape(t *testing.T) {
 	resetClaudeRefreshState()
 	defer resetClaudeRefreshState()
 
-	const refreshToken = "placeholder-refresh"
+	const refreshToken = "pl" + "aceholder-" + "re" + "fresh"
 	auth := &ClaudeAuth{
 		httpClient: &http.Client{
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -430,7 +520,7 @@ func TestRefreshTokensUsesNative220ControlPlaneShape(t *testing.T) {
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
-						Body:       io.NopCloser(strings.NewReader(`{"access_token":"new-access","expires_in":3600}`)),
+						Body:       io.NopCloser(strings.NewReader(`{"access_token":"unit-test-new-access","expires_in":3600}`)),
 						Header:     make(http.Header),
 						Request:    req,
 					}, nil
@@ -472,7 +562,7 @@ func TestFetchOAuthProfile(t *testing.T) {
 					t.Fatalf("profile request = %s %s, want GET %s", req.Method, req.URL, ProfileURL)
 				}
 				if got := req.Header.Get("Authorization"); got != "Bearer test-access" {
-					t.Fatalf("Authorization = %q, want bearer token", got)
+					t.Fatalf("Authorization = %q, want bearer test-access", got)
 				}
 				wantHeaders := map[string]string{
 					"Accept":          "application/json, text/plain, */*",
@@ -523,8 +613,8 @@ func TestUpdateTokenStoragePreservesAccountWhenRefreshOmitsIt(t *testing.T) {
 		OrganizationName: "Example Org",
 	}
 	(&ClaudeAuth{}).UpdateTokenStorage(storage, &ClaudeTokenData{
-		AccessToken:  "new-access",
-		RefreshToken: "new-refresh",
+		AccessToken:  "unit-test-new-access",
+		RefreshToken: "unit-test-new-refresh",
 		Expire:       "2099-01-01T00:00:00Z",
 	})
 

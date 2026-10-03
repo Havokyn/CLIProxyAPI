@@ -293,8 +293,8 @@ requests:
 # Client-facing compatibility settings apply to both OAuth and API-key routes.
 client:
   codex:
-    # Default false clears apply_patch_tool_type in /v1/models?client_version= catalogs.
-    # When true, only models supported by every routing executor advertise "freeform".
+    # When false (default), only models that natively declare freeform apply_patch advertise it.
+    # When true, non-template and bridged models supported by every routing executor also advertise "freeform".
     enable-apply-patch: false
     # When true, optimize Codex Desktop, codex-tui, and codex_cli_rs requests for multi-agent v2.
     # This refreshes Codex spawn_agent model details, removes message parameter encryption,
@@ -498,10 +498,10 @@ upstream:
 #         - "*-preview"          # wildcard matching suffix (e.g. gemini-3-pro-preview)
 #         - "*flash*"            # wildcard matching substring (e.g. gemini-2.5-flash-lite)
 #       keys:
-#         - api-key: "AIzaSy...01"
+#         - api-key: test-only-example-1
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #         # A second key shares this group's endpoint, headers, and models.
-#         - api-key: "replace-with-second-gemini-key"
+#         - api-key: test-only-example-2
 #           weight: 2
 #           priority: null # inherit the group priority
 #           prefix: null # inherit the group prefix
@@ -514,7 +514,7 @@ upstream:
 #           request-scoped-errors: null # inherit the group rules
 #     - name: gemini-2
 #       keys:
-#         - api-key: "AIzaSy...02"
+#         - api-key: test-only-example-3
 #
 #   # Native Interactions API keys
 #   # These keys are used only for direct /v1beta/interactions execution. Regular api-keys.gemini entries still
@@ -548,7 +548,7 @@ upstream:
 #       excluded-models:
 #         - "gemini-2.5-pro"
 #       keys:
-#         - api-key: "AIzaSy...03"
+#         - api-key: test-only-example-4
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #
 #   # Vertex API keys (Vertex-compatible endpoints, base-url is optional)
@@ -578,7 +578,7 @@ upstream:
 #         - "imagen-3.0-generate-002"
 #         - "imagen-*"
 #       keys:
-#         - api-key: "vk-123..."                        # x-goog-api-key header
+#         - api-key: test-only-example-5                        # x-goog-api-key header
 #           weight: 5                                    # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #
 #   # Codex API keys
@@ -620,7 +620,7 @@ upstream:
 #         - "*-mini"          # wildcard matching suffix (e.g. gpt-5-codex-mini)
 #         - "*codex*"         # wildcard matching substring (e.g. gpt-5-codex-low)
 #       keys:
-#         - api-key: "sk-atSM..."
+#         - api-key: test-only-example-6
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #           disable-codex-cloaking: false # optional: true disables cloaking; OAuth provider settings do not apply here
 #           alpha-search: false # optional: allow this key to serve /v1/alpha/search via base-url + /alpha/search
@@ -631,7 +631,7 @@ upstream:
 #   claude:
 #     - name: claude-1
 #       keys:
-#         - api-key: "sk-atSM..." # use the official claude API key, no need to set the base url
+#         - api-key: test-only-example-7 # use the official claude API key, no need to set the base url
 #     - name: claude-2
 #       prefix: "test" # optional: require calls like "test/claude-sonnet-latest" to target this credential
 #       disable-cooling: false # optional override: true disables cooling, false enables it; omit to inherit global
@@ -664,7 +664,7 @@ upstream:
 #         - "*-thinking"               # wildcard matching suffix (e.g. claude-opus-4-5-thinking)
 #         - "*haiku*"                  # wildcard matching substring (e.g. claude-3-5-haiku-20241022)
 #       keys:
-#         - api-key: "sk-atSM..."
+#         - api-key: test-only-example-8
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #           rebuild-mid-system-message: false # optional: default is false; when true, move messages with role "system" into the top-level Claude system field
 #           cloak:                         # optional: explicitly enable request cloaking for non-Claude-Code clients
@@ -724,7 +724,7 @@ upstream:
 #           #   - name: cli-compatible-gateway
 #           #     # base-url: "https://gateway.example"   # omit for api.anthropic.com
 #           #     keys:
-#           #       - api-key: "your-key"
+#           #       - api-key: test-only-example-9
 #           #         fingerprint-profile: "claude-code-cli"
 #           #         cloak:
 #           #           mode: "always"   # recommended when upstream rejects non-CLI clients
@@ -777,7 +777,7 @@ upstream:
 #         - "grok-4.1"             # exclude specific models (exact match)
 #         - "grok-3-*"             # wildcard matching prefix
 #       keys:
-#         - api-key: "xai-..."
+#         - api-key: test-only-example-10
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #           websockets: true # optional: use the xAI upstream websocket transport for downstream websocket requests
 #
@@ -797,7 +797,7 @@ upstream:
 #       excluded-models:
 #         - "muse-spark-1.1"
 #       keys:
-#         - api-key: "..."
+#         - api-key: test-only-example-11
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #
 #   # OpenAI compatibility providers
@@ -825,11 +825,11 @@ upstream:
 #         # If the client did not send the specified header, the header is omitted.
 #         # X-Claude-Code-Session-Id: "$ABC" # copies client's "ABC" header
 #       keys:
-#         - api-key: "sk-or-v1-...b780"
+#         - api-key: test-only-example-12
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #           proxy-url: "socks5://proxy.example.com:1080" # optional: per-key proxy override
 #           # proxy-url: "direct" # optional: explicit direct connect for this credential
-#         - api-key: "sk-or-v1-...b781" # without proxy-url
+#         - api-key: test-only-example-13 # without proxy-url
 #       models: # The models supported by the provider.
 #         - name: "moonshotai/kimi-k2:free" # The actual model name.
 #           alias: "kimi-k2"               # The alias used in the API.
@@ -1197,7 +1197,7 @@ plugins:
 #   codex:                           # now oauth.providers.codex
 #     disable-codex-cloaking: false
 #   codex-api-key:                   # now api-keys.codex groups with keys
-#     - api-key: "your-upstream-key"
+#     - api-key: test-only-example-14
 #       base-url: "https://codex.example.com"
 #
 # Compatibility-only quota switches have no new v8 counterpart. They remain

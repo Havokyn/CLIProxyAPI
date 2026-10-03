@@ -299,6 +299,22 @@ class TailscalePeerTests(unittest.TestCase):
 
 
 class SecretScannerTests(unittest.TestCase):
+    def test_go_references_are_expressions_but_literals_still_fail(self):
+        references = '\n'.join(('Access' + 'Token: tokenResp.AccessToken,',
+                                'Refresh' + 'Token: refreshToken,',
+                                'storage.Access' + 'Token = tokenData.AccessToken',
+                                '"refresh_' + 'token": refreshToken,'))
+        self.assertEqual(scanner.scan_text(references, go_source=True), [])
+        self.assertTrue(scanner.scan_text(references))
+        literal = 'AccessToken: "' + 'synthetic-not-allowlisted' + '",'
+        self.assertTrue(scanner.scan_text(literal, go_source=True))
+        raw = 'const payload = `\n' + references + '\n`'
+        self.assertTrue(scanner.scan_text(raw, go_source=True))
+        comment = '/*\n' + references + '\n*/'
+        self.assertTrue(scanner.scan_text(comment, go_source=True))
+        token = 'sk-' + 'x' * 30
+        self.assertTrue(scanner.scan_text('AccessToken: ' + token + ',', go_source=True))
+
     def test_benign_references_pass_and_literals_fail(self):
         benign = '\n'.join((
             'Use the client_api_key field and Authorization header from the environment.',

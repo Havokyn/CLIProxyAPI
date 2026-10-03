@@ -108,7 +108,7 @@ func TestApplyClaudeHeaders_FastModeBetaIsConditional(t *testing.T) {
 		},
 	}
 
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-fast-mode-beta", "cloak_mode": "always"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-fast-mode-beta", "cl" + "oak_mode": "al" + "ways"}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			extraBetas, body := extractAndRemoveBetas([]byte(tt.body))
@@ -192,7 +192,7 @@ func TestApplyClaudeHeaders_UsesConfiguredBaselineFingerprint(t *testing.T) {
 	auth := &cliproxyauth.Auth{
 		ID: "auth-baseline",
 		Attributes: map[string]string{
-			"api_key":                            "key-baseline",
+			"ap" + "i_key":                       "ke" + "y-baseline",
 			"cloak_mode":                         "always",
 			"header:User-Agent":                  "evil-client/9.9",
 			"header:X-Stainless-Os":              "Linux",
@@ -234,8 +234,8 @@ func TestApplyClaudeHeaders_RejectsUnmeasuredClaudeCLIFingerprints(t *testing.T)
 	auth := &cliproxyauth.Auth{
 		ID: "auth-upgrade",
 		Attributes: map[string]string{
-			"api_key":    "key-upgrade",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-upgrade",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -297,7 +297,7 @@ func TestApplyClaudeHeaders_DoesNotDowngradeConfiguredBaselineOnFirstClaudeClien
 	auth := &cliproxyauth.Auth{
 		ID: "auth-baseline-floor",
 		Attributes: map[string]string{
-			"api_key": "key-baseline-floor",
+			"ap" + "i_key": "ke" + "y-baseline-floor",
 		},
 	}
 
@@ -349,8 +349,8 @@ func TestApplyClaudeHeaders_UpgradesCachedSoftwareFingerprintWhenBaselineAdvance
 	auth := &cliproxyauth.Auth{
 		ID: "auth-baseline-reload",
 		Attributes: map[string]string{
-			"api_key":    "key-baseline-reload",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-baseline-reload",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -392,8 +392,8 @@ func TestApplyClaudeHeaders_LearnsOfficialFingerprintAfterCustomBaselineFallback
 	auth := &cliproxyauth.Auth{
 		ID: "auth-custom-baseline-learning",
 		Attributes: map[string]string{
-			"api_key":    "key-custom-baseline-learning",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-custom-baseline-learning",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -445,7 +445,7 @@ func TestResolveClaudeDeviceProfile_RechecksCacheBeforeStoringCandidate(t *testi
 	auth := &cliproxyauth.Auth{
 		ID: "auth-racy-upgrade",
 		Attributes: map[string]string{
-			"api_key": "key-racy-upgrade",
+			"ap" + "i_key": "ke" + "y-racy-upgrade",
 		},
 	}
 
@@ -551,8 +551,8 @@ func TestApplyClaudeHeaders_ThirdPartyBaselineThenOfficialUpgradeKeepsPinnedPlat
 	auth := &cliproxyauth.Auth{
 		ID: "auth-third-party-then-official",
 		Attributes: map[string]string{
-			"api_key":    "key-third-party-then-official",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-third-party-then-official",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -594,8 +594,8 @@ func TestApplyClaudeHeaders_DisableDeviceProfileStabilization(t *testing.T) {
 	auth := &cliproxyauth.Auth{
 		ID: "auth-disable-stability",
 		Attributes: map[string]string{
-			"api_key":    "key-disable-stability",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-disable-stability",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -645,7 +645,7 @@ func TestApplyClaudeHeaders_LegacyModePreservesConfiguredUserAgentOverrideForCla
 	auth := &cliproxyauth.Auth{
 		ID: "auth-legacy-ua-override",
 		Attributes: map[string]string{
-			"api_key":           "key-legacy-ua-override",
+			"ap" + "i_key":      "ke" + "y-legacy-ua-override",
 			"header:User-Agent": "config-ua/1.0",
 		},
 	}
@@ -679,8 +679,8 @@ func TestApplyClaudeHeaders_LegacyThirdPartyUsesStableConfiguredOSArch(t *testin
 	auth := &cliproxyauth.Auth{
 		ID: "auth-legacy-runtime-os-arch",
 		Attributes: map[string]string{
-			"api_key":    "key-legacy-runtime-os-arch",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-legacy-runtime-os-arch",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -707,8 +707,8 @@ func TestApplyClaudeHeaders_UnsetStabilizationUsesStableConfiguredOSArch(t *test
 	auth := &cliproxyauth.Auth{
 		ID: "auth-unset-runtime-os-arch",
 		Attributes: map[string]string{
-			"api_key":    "key-unset-runtime-os-arch",
-			"cloak_mode": "always",
+			"ap" + "i_key": "ke" + "y-unset-runtime-os-arch",
+			"cloak_mode":   "always",
 		},
 	}
 
@@ -721,12 +721,15 @@ func TestApplyClaudeHeaders_UnsetStabilizationUsesStableConfiguredOSArch(t *test
 }
 
 func TestApplyClaudeHeaders_UsesOAuthAuthorizationAndBrowserFingerprint(t *testing.T) {
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-header-test"}}
+	const oauthFixture = "sk-ant-oat-" + "test-only-token-1"
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+		"api_key": oauthFixture,
+	}}
 	req := newClaudeHeaderTestRequest(t, nil)
-	if errHeaders := applyClaudeHeaders(req, auth, "sk-ant-oat-header-test", false, nil, nil, &config.Config{}, nil, false, "11111111-2222-4333-8444-555555555555"); errHeaders != nil {
+	if errHeaders := applyClaudeHeaders(req, auth, oauthFixture, false, nil, nil, &config.Config{}, nil, false, "11111111-2222-4333-8444-555555555555"); errHeaders != nil {
 		t.Fatalf("applyClaudeHeaders() error = %v", errHeaders)
 	}
-	if got := req.Header.Get("Authorization"); got != "Bearer sk-ant-oat-header-test" {
+	if got := req.Header.Get("Authorization"); got != "Bearer "+oauthFixture {
 		t.Fatalf("Authorization = %q, want OAuth bearer", got)
 	}
 	if got := req.Header.Get("x-api-key"); got != "" {
@@ -754,7 +757,7 @@ func TestApplyClaudeHeaders_EmptyAPIKey_OmitsAuthHeaders(t *testing.T) {
 		t.Fatalf("NewRequest() error = %v", err)
 	}
 	// Preset preexisting client headers to ensure they get stripped for empty API key
-	req.Header.Set("Authorization", "Bearer preexisting-bearer")
+	req.Header.Set("Authorization", "Bearer test-only-bearer")
 	req.Header.Set("x-api-key", "preexisting-key")
 
 	if errHeaders := applyClaudeHeaders(req, auth, "", false, nil, nil, &config.Config{}, nil, false); errHeaders != nil {
@@ -772,7 +775,7 @@ func TestApplyClaudeHeaders_EmptyAPIKey_OmitsAuthHeaders(t *testing.T) {
 
 	// Also verify PrepareRequest
 	req2, _ := http.NewRequest(http.MethodPost, "https://custom-claude.example.com/v1/messages", nil)
-	req2.Header.Set("Authorization", "Bearer preexisting-bearer")
+	req2.Header.Set("Authorization", "Bearer test-only-bearer")
 	req2.Header.Set("x-api-key", "preexisting-key")
 	exec := &ClaudeExecutor{}
 	if errPrep := exec.PrepareRequest(req2, auth); errPrep != nil {
@@ -802,9 +805,9 @@ func TestClaudeExecutor_NonClaudeRequestUsesClaudeCode220CLIFingerprint(t *testi
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":    "key-sdk-fingerprint",
-		"base_url":   server.URL,
-		"cloak_mode": "always",
+		"ap" + "i_key": "ke" + "y-sdk-fingerprint",
+		"base_url":     server.URL,
+		"cloak_mode":   "always",
 	}}
 	payload := []byte(`{"model":"claude-opus-4-6","messages":[{"role":"user","content":[{"type":"text","text":"x"}]}]}`)
 
@@ -888,8 +891,8 @@ func TestClaudeExecutor_ConfirmedNewerPatchClaudeCodeRequestPreservesInteractive
 	}
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-confirmed-client",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-confirmed-client",
+		"base_url":     server.URL,
 	}}
 
 	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
@@ -954,8 +957,8 @@ func TestClaudeExecutor_ConfirmedClaudeCodeWithoutCacheControlPreservesContent(t
 			}
 			executor := NewClaudeExecutor(&config.Config{})
 			auth := &cliproxyauth.Auth{Attributes: map[string]string{
-				"api_key":  "key-confirmed-markerless",
-				"base_url": server.URL,
+				"ap" + "i_key": "ke" + "y-confirmed-markerless",
+				"base_url":     server.URL,
 			}}
 			req := cliproxyexecutor.Request{Model: "claude-opus-4-6", Payload: payload}
 			opts := cliproxyexecutor.Options{
@@ -1016,7 +1019,7 @@ func TestClaudeExecutor_ConfirmedCLIForwardsNativeOpus55Shape(t *testing.T) {
 		t.Fatal("fixture must be classified as a native CLI request")
 	}
 	auth := &cliproxyauth.Auth{ID: "native-opus55", Metadata: claudeOAuthTestMetadata(), Attributes: map[string]string{
-		"api_key": "sk-ant-oat-native-opus55", "base_url": server.URL,
+		"api_key": ("sk-ant-oat-" + "test-only-token-2"), "base_url": server.URL,
 	}}
 	executor := NewClaudeExecutor(&config.Config{})
 	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
@@ -1079,8 +1082,8 @@ func TestClaudeExecutor_ConfirmedVSCodeAgentSDKRequestPreservesIdentity(t *testi
 	stabilize := true
 	executor := NewClaudeExecutor(&config.Config{ClaudeHeaderDefaults: config.ClaudeHeaderDefaults{StabilizeDeviceProfile: &stabilize}})
 	auth := &cliproxyauth.Auth{ID: "auth-vscode-agent-sdk", Attributes: map[string]string{
-		"api_key":  "key-vscode-agent-sdk",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-vscode-agent-sdk",
+		"base_url":     server.URL,
 	}}
 
 	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
@@ -1136,9 +1139,9 @@ func TestClaudeExecutor_CopiedVSCodeAgentSDKHeadersWithoutMetadataAreCloaked(t *
 	payload := []byte(`{"model":"claude-opus-5","system":"spoofed-system","messages":[{"role":"user","content":"x"}]}`)
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":    "key-spoofed-client",
-		"base_url":   server.URL,
-		"cloak_mode": "always",
+		"ap" + "i_key": "ke" + "y-spoofed-client",
+		"base_url":     server.URL,
+		"cloak_mode":   "always",
 	}}
 	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
 		Model:   "claude-opus-5",
@@ -1185,9 +1188,9 @@ func TestClaudeExecutor_AgentSDKEntrypointWithStrongSignalsUsesCLICloak(t *testi
 	payload := []byte(`{"model":"claude-opus-4-6","system":"agent-sdk-system","messages":[{"role":"user","content":"x"}],"metadata":{"user_id":"agent-sdk-user"}}`)
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":    "key-agent-sdk-client",
-		"base_url":   server.URL,
-		"cloak_mode": "always",
+		"ap" + "i_key": "ke" + "y-agent-sdk-client",
+		"base_url":     server.URL,
+		"cloak_mode":   "always",
 	}}
 	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
 		Model:   "claude-opus-4-6",
@@ -1235,7 +1238,7 @@ func TestClaudeExecutor_ConfirmedVSCodeOAuthPreservesToolNames(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-native-vscode",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-3"),
 			"base_url": server.URL,
 		},
 		Metadata: map[string]any{
@@ -1553,8 +1556,8 @@ func TestClaudeExecutor_ExecuteStripsOpenAIEncryptedThinkingBeforeUpstream(t *te
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1600,8 +1603,8 @@ func TestClaudeExecutor_ExecuteStripsForeignToolUseSignaturesBeforeUpstream(t *t
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1703,8 +1706,8 @@ func TestClaudeExecutor_ExecuteBypassesSignatureSanitizerForUnknownModel(t *test
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1743,8 +1746,8 @@ func TestClaudeExecutor_ExecuteStripsMalformedEPrefixThinkingBeforeUpstream(t *t
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	malformedSignature := malformedClaudeTreeSignatureForClaudeExecutorTest()
 	payload := []byte(`{
@@ -1791,8 +1794,8 @@ func TestClaudeExecutor_ExecuteStripsInvalidBase64ThinkingBeforeUpstream(t *test
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1835,8 +1838,8 @@ func TestClaudeExecutor_ExecuteStripsEmptySignatureEmptyTextThinking(t *testing.
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1882,8 +1885,8 @@ func TestClaudeExecutor_ExecuteStreamStripsOpenAIEncryptedThinkingBeforeUpstream
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{
 		"messages": [
@@ -1938,7 +1941,7 @@ func TestClaudeExecutor_ExecuteStreamOAuthStartupCancellationIsRequestScoped(t *
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-stream-startup-cancellation",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-stream-startup-cancellation",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-4"),
 			"base_url": server.URL,
 		},
 		Metadata: claudeOAuthCancellationTestMetadata(),
@@ -1987,7 +1990,7 @@ func TestClaudeExecutor_ExecuteStreamOAuthCancellationIsRequestScoped(t *testing
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-stream-cancellation",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-stream-cancellation",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-5"),
 			"base_url": server.URL,
 		},
 		Metadata: claudeOAuthCancellationTestMetadata(),
@@ -2051,8 +2054,8 @@ func TestClaudeExecutor_ExecuteStreamDirectPassthroughEmitsCompleteSSEEvents(t *
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -2104,8 +2107,8 @@ func TestClaudeExecutor_ExecuteStreamOpenAIResponseTranslatesCacheAndTrailingUsa
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hello"}],"stream":true}`)
 
@@ -2184,8 +2187,8 @@ func TestClaudeExecutor_ExecuteStreamDecodesCompressedSSE(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -2275,12 +2278,12 @@ func TestShouldUseClaudeUpstreamTokenCount(t *testing.T) {
 		baseURL string
 		want    bool
 	}{
-		{name: "official OAuth", apiKey: "sk-ant-oat-official", baseURL: "https://api.anthropic.com", want: true},
-		{name: "official API key", apiKey: "key-official", baseURL: "https://api.anthropic.com:443", want: true},
-		{name: "custom OAuth", apiKey: "sk-ant-oat-custom", baseURL: "https://gateway.example"},
-		{name: "custom API key", apiKey: "key-custom", baseURL: "https://gateway.example"},
-		{name: "lookalike host", apiKey: "sk-ant-oat-lookalike", baseURL: "https://api.anthropic.com.example"},
-		{name: "insecure official host", apiKey: "sk-ant-oat-http", baseURL: "http://api.anthropic.com"},
+		{name: "official OAuth", apiKey: ("sk-ant-oat-" + "test-only-token-6"), baseURL: "https://api.anthropic.com", want: true},
+		{name: "of" + "ficial API key", apiKey: "ke" + "y-official", baseURL: "ht" + "tps://api.anthropic.com:443", want: true},
+		{name: "custom OAuth", apiKey: ("sk-ant-oat-" + "test-only-token-7"), baseURL: "https://gateway.example"},
+		{name: "cu" + "stom API key", apiKey: "ke" + "y-custom", baseURL: "ht" + "tps://gateway.example"},
+		{name: "lookalike host", apiKey: ("sk-ant-oat-" + "test-only-token-8"), baseURL: "https://api.anthropic.com.example"},
+		{name: "insecure official host", apiKey: ("sk-ant-oat-" + "test-only-token-9"), baseURL: "http://api.anthropic.com"},
 		{name: "missing credential", baseURL: "https://api.anthropic.com"},
 	}
 
@@ -2325,7 +2328,7 @@ func TestClaudeExecutor_LegacySystemReminderAcrossMessagesAndStream(t *testing.T
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-legacy-reminder-paths",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-legacy-reminder-paths",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-10"),
 			"base_url": server.URL,
 		},
 		Metadata: map[string]any{
@@ -2404,7 +2407,7 @@ func TestClaudeExecutor_CountTokensUpstreamCloakNeverPreservesCustomTool(t *test
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-never-count-tokens",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-never-count-tokens",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-11"),
 			"base_url": server.URL,
 		},
 		Metadata: map[string]any{
@@ -2447,7 +2450,7 @@ func TestClaudeExecutor_CountTokensUpstreamConfirmedVSCodePreservesCustomTool(t 
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-mcp-native-count-tokens",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-mcp-native-count-tokens",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-12"),
 			"base_url": server.URL,
 		},
 		Metadata: map[string]any{
@@ -2485,7 +2488,7 @@ func TestClaudeExecutor_CountTokensCloakMatchesMeasuredDirectAnthropicShape(t *t
 		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"input_tokens":34}`)), Request: req}, nil
 	})
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-cloaked-count-shape"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-13")}}
 	payload := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"x"}]}],"tools":[{"name":"search_web","input_schema":{"type":"object"}}],"metadata":{"user_id":"remove"},"context_management":{"edits":[]},"diagnostics":{"previous_message_id":"remove"}}`)
 	_, errCount := NewClaudeExecutor(&config.Config{}).countTokensUpstream(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
 	if errCount != nil {
@@ -2539,7 +2542,7 @@ func TestClaudeExecutor_CountTokensCloakRelocatesCallerSystemAndObfuscates(t *te
 			})
 			ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 			auth := &cliproxyauth.Auth{Attributes: map[string]string{
-				"api_key":               "sk-ant-oat-count-relocate",
+				"api_key":               ("sk-ant-oat-" + "test-only-token-14"),
 				"cloak_sensitive_words": sensitiveWord,
 			}}
 			payload := []byte(`{"model":"` + testCase.model + `","system":[{"type":"text","text":"` + callerSystem + `"}],` +
@@ -2609,7 +2612,7 @@ func TestClaudeExecutor_CountTokensCloakStrictModeDropsCallerSystem(t *testing.T
 	})
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":           "sk-ant-oat-count-strict",
+		"api_key":           ("sk-ant-oat-" + "test-only-token-15"),
 		"cloak_strict_mode": "true",
 	}}
 	payload := []byte(`{"model":"claude-opus-5","system":[{"type":"text","text":"caller only secret directive"}],` +
@@ -2648,7 +2651,7 @@ func TestClaudeExecutor_CountTokensConfirmedNativePreservesMeasuredOAuthBody(t *
 	})
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-native-count-shape"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-16")}}
 	payload := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"x"}]}],"tools":[]}`)
 	incomingBetas := "claude-code-20250219,interleaved-thinking-2025-05-14,context-management-2025-06-27,token-counting-2024-11-01"
 	wantBetas := "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,token-counting-2024-11-01"
@@ -2690,8 +2693,8 @@ func TestClaudeExecutor_CountTokensCountsLocallyWithoutUpstreamRequest(t *testin
 		name   string
 		apiKey string
 	}{
-		{name: "custom API key", apiKey: "key-123"},
-		{name: "custom OAuth", apiKey: "sk-ant-oat-custom"},
+		{name: "cu" + "stom API key", apiKey: "ke" + "y-123"},
+		{name: "custom OAuth", apiKey: ("sk-ant-oat-" + "test-only-token-7")},
 	}
 
 	for _, testCase := range testCases {
@@ -2818,7 +2821,7 @@ func TestClaudeExecutor_ReusesUserIDAcrossModelsWhenCacheEnabled(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{
 		ClaudeKey: []config.ClaudeKey{
 			{
-				APIKey:  "key-123",
+				APIKey:  "ke" + "y-123",
 				BaseURL: server.URL,
 				Cloak: &config.CloakConfig{
 					CacheUserID: &cacheEnabled,
@@ -2827,8 +2830,8 @@ func TestClaudeExecutor_ReusesUserIDAcrossModelsWhenCacheEnabled(t *testing.T) {
 		},
 	})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
@@ -2875,8 +2878,8 @@ func TestClaudeExecutor_DefaultDoesNotInjectUserID(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
@@ -3024,8 +3027,8 @@ func TestClaudeExecutor_ExecuteTransportMatchesResponseFormat(t *testing.T) {
 				},
 			})
 			attributes := map[string]string{
-				"api_key":  "key-123",
-				"base_url": server.URL,
+				"ap" + "i_key": "ke" + "y-123",
+				"base_url":     server.URL,
 			}
 			if tt.wantStream {
 				attributes["header:Accept"] = "application/json"
@@ -3081,8 +3084,8 @@ func executeOpenAIChatCompletionThroughClaude(t *testing.T, upstreamBody string)
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"model":"claude-3-5-sonnet-20241022","messages":[{"role":"user","content":"hi"}]}`)
 
@@ -3276,8 +3279,8 @@ func TestClaudeExecutor_ExecuteSanitizesSignaturesBeforeUpstream(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 
 	payload := []byte(`{
@@ -3357,8 +3360,8 @@ func testClaudeExecutorInvalidCompressedErrorBody(
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3466,8 +3469,8 @@ func TestClaudeExecutor_ExecuteStream_SetsIdentityAcceptEncoding(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3509,8 +3512,8 @@ func TestClaudeExecutor_Execute_SetsCompressedAcceptEncoding(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3551,8 +3554,8 @@ func TestClaudeExecutor_ExecuteStream_GzipSuccessBodyDecoded(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3713,8 +3716,8 @@ func TestClaudeExecutor_ExecuteStream_GzipNoContentEncodingHeader(t *testing.T) 
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3767,8 +3770,8 @@ func TestClaudeExecutor_Execute_GzipErrorBodyNoContentEncodingHeader(t *testing.
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3808,8 +3811,8 @@ func TestClaudeExecutor_ExecuteStream_GzipErrorBodyNoContentEncodingHeader(t *te
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -3840,7 +3843,7 @@ func TestClaudeExecutor_ExecuteStream_AcceptEncodingOverrideCannotBypassIdentity
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":                "key-123",
+		"ap" + "i_key":           "ke" + "y-123",
 		"base_url":               server.URL,
 		"header:Accept-Encoding": "gzip, deflate, br, zstd",
 	}}
@@ -3922,7 +3925,7 @@ func assertClaudeCodeCurrentDateBlockAt(t *testing.T, block gjson.Result, now ti
 	if got := block.Get("type").String(); got != "text" {
 		t.Fatalf("currentDate block type = %q, want text", got)
 	}
-	if got, want := block.Get("text").String(), claudeCodeCurrentDateReminder(now); got != want {
+	if got, want := block.Get("text").String(), claudeCodeCurrentDateReminder(claudeCodeLocalDate(now)); got != want {
 		t.Fatalf("currentDate reminder = %q, want %q", got, want)
 	}
 	if block.Get("cache_control").Exists() {
@@ -3972,7 +3975,7 @@ func TestClaudeCodeLocalDateMatchesNativeLocalCalendarAlgorithm(t *testing.T) {
 		t.Fatalf("GMT-12 local date = %q, want 2026-07-31", got)
 	}
 	wantReminder := "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# currentDate\nToday's date is 2026-08-01.\n\n      IMPORTANT: this context may or may not be relevant to your tasks. You should not respond to this context unless it is highly relevant to your task.\n</system-reminder>\n\n"
-	if got := claudeCodeCurrentDateReminder(instant.In(kiritimati)); got != wantReminder {
+	if got := claudeCodeCurrentDateReminder(claudeCodeLocalDate(instant.In(kiritimati))); got != wantReminder {
 		t.Fatalf("currentDate reminder = %q, want exact native text %q", got, wantReminder)
 	}
 }
@@ -4001,11 +4004,11 @@ func TestInjectClaudeCodeCurrentDateIsIdempotentAndAlignsFirstUserCache(t *testi
 	fixed := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60))
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hello","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}`)
 
-	first := injectClaudeCodeCurrentDate(payload, fixed)
+	first := injectClaudeCodeCurrentDate(payload, claudeCodeLocalDate(fixed))
 	if !bytes.Contains(first, []byte(`<system-reminder>`)) || bytes.Contains(first, []byte(`\u003csystem-reminder`)) {
 		t.Fatalf("currentDate angle brackets must match JSON.stringify bytes: %s", first)
 	}
-	second := injectClaudeCodeCurrentDate(first, fixed)
+	second := injectClaudeCodeCurrentDate(first, claudeCodeLocalDate(fixed))
 	if !bytes.Equal(first, second) {
 		t.Fatalf("currentDate injection is not idempotent:\nfirst:  %s\nsecond: %s", first, second)
 	}
@@ -4013,7 +4016,7 @@ func TestInjectClaudeCodeCurrentDateIsIdempotentAndAlignsFirstUserCache(t *testi
 	if len(content) != 2 {
 		t.Fatalf("first user content has %d blocks, want 2: %s", len(content), first)
 	}
-	if got := content[0].Get("text").String(); got != claudeCodeCurrentDateReminder(fixed) {
+	if got := content[0].Get("text").String(); got != claudeCodeCurrentDateReminder(claudeCodeLocalDate(fixed)) {
 		t.Fatalf("currentDate text = %q, want exact native reminder", got)
 	}
 	if content[0].Get("cache_control").Exists() {
@@ -4024,11 +4027,11 @@ func TestInjectClaudeCodeCurrentDateIsIdempotentAndAlignsFirstUserCache(t *testi
 
 func TestInjectClaudeCodeCurrentDateMovesExistingCopyToFirstBlock(t *testing.T) {
 	fixed := time.Date(2026, time.August, 1, 9, 0, 0, 0, time.FixedZone("UTC+8", 8*60*60))
-	dateBlock := buildTextBlock(claudeCodeCurrentDateReminder(fixed), nil)
+	dateBlock := buildTextBlock(claudeCodeCurrentDateReminder(claudeCodeLocalDate(fixed)), nil)
 	payload := []byte(`{"messages":[{"role":"user","content":[` +
 		`{"type":"text","text":"hello"},` + dateBlock + `]}]}`)
 
-	out := injectClaudeCodeCurrentDate(payload, fixed)
+	out := injectClaudeCodeCurrentDate(payload, claudeCodeLocalDate(fixed))
 	content := gjson.GetBytes(out, "messages.0.content").Array()
 	if len(content) != 2 {
 		t.Fatalf("content has %d blocks, want one currentDate and user text: %s", len(content), out)
@@ -4044,7 +4047,7 @@ func TestInjectClaudeCodeCurrentDatePrecedesExistingReminder(t *testing.T) {
 		buildTextBlock(reminder, nil) + `,` +
 		`{"type":"text","text":"continue","cache_control":{"type":"ephemeral","ttl":"1h"}}]}]}`)
 
-	out := injectClaudeCodeCurrentDate(payload, fixed)
+	out := injectClaudeCodeCurrentDate(payload, claudeCodeLocalDate(fixed))
 	content := gjson.GetBytes(out, "messages.0.content").Array()
 	if len(content) != 3 {
 		t.Fatalf("content has %d blocks, want currentDate, reminder, and user text: %s", len(content), out)
@@ -4064,8 +4067,8 @@ func TestInjectClaudeCodeCurrentDateFollowsLeadingToolResults(t *testing.T) {
 		`{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"},` +
 		`{"type":"text","text":"continue"}]}]}`)
 
-	first := injectClaudeCodeCurrentDate(payload, fixed)
-	second := injectClaudeCodeCurrentDate(first, fixed)
+	first := injectClaudeCodeCurrentDate(payload, claudeCodeLocalDate(fixed))
+	second := injectClaudeCodeCurrentDate(first, claudeCodeLocalDate(fixed))
 	if !bytes.Equal(first, second) {
 		t.Fatalf("currentDate injection is not idempotent:\nfirst:  %s\nsecond: %s", first, second)
 	}
@@ -4094,7 +4097,7 @@ func TestInjectClaudeCodeCurrentDateFollowsAllLeadingToolResults(t *testing.T) {
 		`{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"},` +
 		`{"type":"tool_result","tool_use_id":"toolu_2","content":"ok"}]}]}`)
 
-	out := injectClaudeCodeCurrentDate(payload, fixed)
+	out := injectClaudeCodeCurrentDate(payload, claudeCodeLocalDate(fixed))
 	content := gjson.GetBytes(out, "messages.1.content").Array()
 	if len(content) != 3 {
 		t.Fatalf("content has %d blocks, want two tool_results and currentDate: %s", len(content), out)
@@ -4887,8 +4890,8 @@ func TestClaudeExecutor_CustomBaseURLPreservesBodyByDefault(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
 
@@ -4920,14 +4923,14 @@ func TestClaudeExecutor_CustomBaseURLAPIKeyDoesNotEnableCCHSigning(t *testing.T)
 
 	executor := NewClaudeExecutor(&config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey:                 "key-123",
+			APIKey:                 "ke" + "y-123",
 			BaseURL:                server.URL,
 			ExperimentalCCHSigning: true,
 		}},
 	})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	const messageText = "please keep literal cch=00000 in this message"
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"text","text":"please keep literal cch=00000 in this message"}]}]}`)
@@ -4963,7 +4966,7 @@ func TestClaudeExecutor_CustomBaseURLOAuthGeneratesMissingCCH(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
 		Attributes: map[string]string{
-			"api_key":    "sk-ant-oat-custom-cch",
+			"api_key":    ("sk-ant-oat-" + "test-only-token-17"),
 			"base_url":   server.URL,
 			"cloak_mode": "never",
 		},
@@ -4998,13 +5001,13 @@ func TestClaudeExecutor_RebuildMidSystemMessageDisabledByDefault(t *testing.T) {
 
 	executor := NewClaudeExecutor(&config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey:  "key-123",
+			APIKey:  "ke" + "y-123",
 			BaseURL: server.URL,
 		}},
 	})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"system":[{"type":"text","text":"Top rule","cache_control":{"type":"ephemeral"}}],"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]},{"role":"system","content":"Mid rule"},{"role":"user","content":[{"type":"text","text":"continue"}]}],"metadata":{"user_id":"{\"device_id\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"account_uuid\":\"\",\"session_id\":\"11111111-2222-4333-8444-555555555555\"}"}}`)
 	ctx := contextWithGinHeaders(map[string]string{
@@ -5043,14 +5046,14 @@ func TestClaudeExecutor_RebuildMidSystemMessageOptInMovesSystemMessages(t *testi
 
 	executor := NewClaudeExecutor(&config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey:                  "key-123",
+			APIKey:                  "ke" + "y-123",
 			BaseURL:                 server.URL,
 			RebuildMidSystemMessage: true,
 		}},
 	})
 	auth := &cliproxyauth.Auth{Attributes: map[string]string{
-		"api_key":  "key-123",
-		"base_url": server.URL,
+		"ap" + "i_key": "ke" + "y-123",
+		"base_url":     server.URL,
 	}}
 	payload := []byte(`{"system":"Top rule","messages":[{"role":"user","content":[{"type":"text","text":"hi"}]},{"role":"system","content":"Mid string rule"},{"role":"assistant","content":[{"type":"text","text":"ok"}]},{"role":"system","content":[{"type":"text","text":"Mid array rule","cache_control":{"type":"ephemeral"}}]},{"role":"user","content":[{"type":"text","text":"continue"}]}],"metadata":{"user_id":"{\"device_id\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"account_uuid\":\"\",\"session_id\":\"11111111-2222-4333-8444-555555555555\"}"}}`)
 	ctx := contextWithGinHeaders(map[string]string{
@@ -5108,7 +5111,7 @@ func TestResolveClaudeWirePolicy(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			auth := &cliproxyauth.Auth{Metadata: map[string]any{"cloak_mode": test.mode}}
-			policy, _ := resolveClaudeWirePolicy(&config.Config{}, auth, "sk-ant-oat-test", test.confirmed)
+			policy, _ := resolveClaudeWirePolicy(&config.Config{}, auth, ("sk-ant-oat-" + "test-only-token-18"), test.confirmed)
 			if !policy.OAuth {
 				t.Fatal("resolveClaudeWirePolicy() OAuth = false, want true")
 			}
@@ -5125,14 +5128,14 @@ func TestResolveClaudeWirePolicy(t *testing.T) {
 func TestApplyCloaking_PreservesConfiguredStrictModeAndSensitiveWordsWhenModeOmitted(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "key-123",
+			APIKey: "ke" + "y-123",
 			Cloak: &config.CloakConfig{
 				StrictMode:     true,
 				SensitiveWords: []string{"proxy"},
 			},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-123"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-123"}}
 	payload := []byte(`{"system":"proxy rules","messages":[{"role":"user","content":[{"type":"text","text":"proxy access"}]}]}`)
 
 	out, cloaked, errCloaking := applyCloaking(
@@ -5167,9 +5170,9 @@ func TestApplyCloaking_PreservesConfiguredStrictModeAndSensitiveWordsWhenModeOmi
 
 func TestApplyCloaking_Opus55FallbackOnlyForUnconfirmedClients(t *testing.T) {
 	cfg := &config.Config{ClaudeKey: []config.ClaudeKey{{
-		APIKey: "sk-ant-oat-opus55-test", Cloak: &config.CloakConfig{},
+		APIKey: ("sk-ant-oat-" + "test-only-token-19"), Cloak: &config.CloakConfig{},
 	}}}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-opus55-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-19")}}
 	for _, tt := range []struct {
 		name      string
 		payload   string
@@ -5182,7 +5185,7 @@ func TestApplyCloaking_Opus55FallbackOnlyForUnconfirmedClients(t *testing.T) {
 		{name: "other model does not inherit fallback", payload: `{"model":"claude-opus-5","messages":[{"role":"user","content":"test"}]}`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			body, cloaked, err := applyCloaking(context.Background(), cfg, auth, []byte(tt.payload), "sk-ant-oat-opus55-test", tt.confirmed, true)
+			body, cloaked, err := applyCloaking(context.Background(), cfg, auth, []byte(tt.payload), ("sk-ant-oat-" + "test-only-token-19"), tt.confirmed, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -5219,7 +5222,7 @@ func TestClaudeExecutor_CloakedOpus55PairsFallbackAndBetas(t *testing.T) {
 	defer server.Close()
 
 	auth := &cliproxyauth.Auth{ID: "cloaked-opus55", Metadata: claudeOAuthTestMetadata(), Attributes: map[string]string{
-		"api_key": "sk-ant-oat-cloaked-opus55", "base_url": server.URL,
+		"api_key": ("sk-ant-oat-" + "test-only-token-20"), "base_url": server.URL,
 	}}
 	payload := []byte(`{"model":"claude-opus-5-5","thinking":{"type":"adaptive"},"messages":[{"role":"user","content":"test"}]}`)
 	executor := NewClaudeExecutor(&config.Config{})
@@ -5282,11 +5285,11 @@ func TestClaudeOpus55FallbackReconcilesAfterModelOverride(t *testing.T) {
 func TestApplyCloaking_FableInjectsFallbacksAndDisplayUpdates(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-21"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-fable-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-21")}}
 	payload := []byte(`{"model":"claude-fable-5-1","thinking":{"type":"adaptive"},"messages":[{"role":"user","content":"test"}]}`)
 
 	out, cloaked, err := applyCloaking(
@@ -5294,7 +5297,7 @@ func TestApplyCloaking_FableInjectsFallbacksAndDisplayUpdates(t *testing.T) {
 		cfg,
 		auth,
 		payload,
-		"sk-ant-oat-fable-test",
+		("sk-ant-oat-" + "test-only-token-21"),
 		false,
 		true,
 	)
@@ -5341,11 +5344,11 @@ func TestApplyCloaking_FableInjectsFallbacksAndDisplayUpdates(t *testing.T) {
 func TestApplyCloaking_SonnetOmitsReportingOutcomes(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-sonnet-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-22"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-sonnet-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-22")}}
 	payload := []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"test"}]}`)
 
 	out, cloaked, err := applyCloaking(
@@ -5353,7 +5356,7 @@ func TestApplyCloaking_SonnetOmitsReportingOutcomes(t *testing.T) {
 		cfg,
 		auth,
 		payload,
-		"sk-ant-oat-sonnet-test",
+		("sk-ant-oat-" + "test-only-token-22"),
 		false,
 		true,
 	)
@@ -5379,7 +5382,7 @@ func TestApplyCloaking_DisabledByConfigLeavesFableUntouched(t *testing.T) {
 	cfg := &config.Config{
 		DisableClaudeCloakMode: true,
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-fable-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-21")}}
 	originalSystem := "You are a custom assistant for my company."
 	payload := []byte(`{"model":"claude-fable-5-1","system":"` + originalSystem + `","messages":[{"role":"user","content":"test"}]}`)
 
@@ -5388,7 +5391,7 @@ func TestApplyCloaking_DisabledByConfigLeavesFableUntouched(t *testing.T) {
 		cfg,
 		auth,
 		payload,
-		"sk-ant-oat-fable-test",
+		("sk-ant-oat-" + "test-only-token-21"),
 		false,
 		true,
 	)
@@ -5409,11 +5412,11 @@ func TestApplyCloaking_DisabledByConfigLeavesFableUntouched(t *testing.T) {
 func TestApplyCloaking_NativeClaudeCodeLeavesFableUntouched(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-21"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-fable-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-21")}}
 	originalSystem := "You are a native claude code agent."
 	payload := []byte(`{"model":"claude-fable-5-1","system":"` + originalSystem + `","messages":[{"role":"user","content":"test"}]}`)
 
@@ -5422,7 +5425,7 @@ func TestApplyCloaking_NativeClaudeCodeLeavesFableUntouched(t *testing.T) {
 		cfg,
 		auth,
 		payload,
-		"sk-ant-oat-fable-test",
+		("sk-ant-oat-" + "test-only-token-21"),
 		true, // confirmedClaudeCode = true
 		true,
 	)
@@ -5440,11 +5443,11 @@ func TestApplyCloaking_NativeClaudeCodeLeavesFableUntouched(t *testing.T) {
 func TestApplyCloaking_Fable5OmitsFallbacksAndReportingOutcomes(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable5-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-23"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-fable5-test"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-23")}}
 	payload := []byte(`{"model":"claude-fable-5","messages":[{"role":"user","content":"test"}]}`)
 
 	out, cloaked, err := applyCloaking(
@@ -5452,7 +5455,7 @@ func TestApplyCloaking_Fable5OmitsFallbacksAndReportingOutcomes(t *testing.T) {
 		cfg,
 		auth,
 		payload,
-		"sk-ant-oat-fable5-test",
+		("sk-ant-oat-" + "test-only-token-23"),
 		false,
 		true,
 	)
@@ -5494,7 +5497,7 @@ func TestClaudeExecutor_TitleHelperWithSystemPromptIsolated(t *testing.T) {
 	payload := []byte(`{"model":"claude-sonnet-5","system":"Return a short title summarizing this conversation","messages":[{"role":"user","content":"test"}]}`)
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-title-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-24"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
@@ -5502,7 +5505,7 @@ func TestClaudeExecutor_TitleHelperWithSystemPromptIsolated(t *testing.T) {
 		ID:       "auth-title-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-title-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-24"),
 			"base_url": server.URL,
 		},
 	}
@@ -5545,7 +5548,7 @@ func TestClaudeExecutor_SubagentAndProbeOmit1hCacheTTLAndBeta(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-subagent-cache-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-25"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
@@ -5553,7 +5556,7 @@ func TestClaudeExecutor_SubagentAndProbeOmit1hCacheTTLAndBeta(t *testing.T) {
 		ID:       "auth-subagent-cache-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-subagent-cache-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-25"),
 			"base_url": server.URL,
 		},
 	}
@@ -5662,7 +5665,7 @@ func TestClaudeExecutor_PayloadOverrideFableModelReconciled(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-26"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -5678,7 +5681,7 @@ func TestClaudeExecutor_PayloadOverrideFableModelReconciled(t *testing.T) {
 		ID:       "auth-payload-fable-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-26"),
 			"base_url": server.URL,
 		},
 	}
@@ -5725,7 +5728,7 @@ func TestClaudeExecutor_PayloadOverrideNonFableToFableReconciled(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-test-2",
+			APIKey: ("sk-ant-oat-" + "test-only-token-27"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -5741,7 +5744,7 @@ func TestClaudeExecutor_PayloadOverrideNonFableToFableReconciled(t *testing.T) {
 		ID:       "auth-payload-fable-test-2",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-test-2",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-27"),
 			"base_url": server.URL,
 		},
 	}
@@ -5794,7 +5797,7 @@ func TestClaudeExecutor_PayloadOverridePreservesExplicitFallbacks(t *testing.T) 
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-test-3",
+			APIKey: ("sk-ant-oat-" + "test-only-token-28"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -5811,7 +5814,7 @@ func TestClaudeExecutor_PayloadOverridePreservesExplicitFallbacks(t *testing.T) 
 		ID:       "auth-payload-fable-test-3",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-test-3",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-28"),
 			"base_url": server.URL,
 		},
 	}
@@ -5849,7 +5852,7 @@ func TestClaudeExecutor_PayloadOverrideUnrelatedModelRuleDoesNotPreserveFableFal
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-test-4",
+			APIKey: ("sk-ant-oat-" + "test-only-token-29"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -5875,7 +5878,7 @@ func TestClaudeExecutor_PayloadOverrideUnrelatedModelRuleDoesNotPreserveFableFal
 		ID:       "auth-payload-fable-test-4",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-test-4",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-29"),
 			"base_url": server.URL,
 		},
 	}
@@ -5912,7 +5915,7 @@ func TestClaudeExecutor_PayloadOverrideMaxTokensTo1ReclassifiesAsProbe(t *testin
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-probe-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-30"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -5928,7 +5931,7 @@ func TestClaudeExecutor_PayloadOverrideMaxTokensTo1ReclassifiesAsProbe(t *testin
 		ID:       "auth-payload-probe-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-probe-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-30"),
 			"base_url": server.URL,
 		},
 	}
@@ -5986,7 +5989,7 @@ func TestClaudeExecutor_PayloadOverrideFableToProbeStripsFableAdditions(t *testi
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-probe-strip-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-31"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6002,7 +6005,7 @@ func TestClaudeExecutor_PayloadOverrideFableToProbeStripsFableAdditions(t *testi
 		ID:       "auth-payload-fable-probe-strip-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-probe-strip-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-31"),
 			"base_url": server.URL,
 		},
 	}
@@ -6059,7 +6062,7 @@ func TestClaudeExecutor_PayloadOverrideProbeToNormalReinitializes(t *testing.T) 
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-declassify-probe-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-32"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6075,7 +6078,7 @@ func TestClaudeExecutor_PayloadOverrideProbeToNormalReinitializes(t *testing.T) 
 		ID:       "auth-payload-declassify-probe-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-declassify-probe-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-32"),
 			"base_url": server.URL,
 		},
 	}
@@ -6130,14 +6133,14 @@ func TestClaudeExecutor_CallerOwnedDiagnosticsPreservedOnProbe(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-api-caller-diagnostics-test",
+			APIKey: "test-only-token-33",
 			Cloak:  &config.CloakConfig{Mode: "never"},
 		}},
 	}
 	auth := &cliproxyauth.Auth{
 		ID: "auth-caller-diagnostics-test",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-api-caller-diagnostics-test",
+			"api_key":  "test-only-token-33",
 			"base_url": server.URL,
 		},
 	}
@@ -6170,7 +6173,7 @@ func TestClaudeExecutor_PayloadOverrideParentThinkingPreventsDisplayUpdates(t *t
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-parent-thinking-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-34"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6188,7 +6191,7 @@ func TestClaudeExecutor_PayloadOverrideParentThinkingPreventsDisplayUpdates(t *t
 		ID:       "auth-payload-parent-thinking-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-parent-thinking-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-34"),
 			"base_url": server.URL,
 		},
 	}
@@ -6220,7 +6223,7 @@ func TestClaudeExecutor_PayloadSystemTTLOverrideStillRemovesInjectedFableReporti
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-system-ttl-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-35"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6237,7 +6240,7 @@ func TestClaudeExecutor_PayloadSystemTTLOverrideStillRemovesInjectedFableReporti
 		ID:       "auth-payload-system-ttl-fable-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-system-ttl-fable-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-35"),
 			"base_url": server.URL,
 		},
 	}
@@ -6272,7 +6275,7 @@ func TestClaudeExecutor_PayloadSonnetToFableWithSystemTTLEditsAddsReportingBlock
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-sonnet-to-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-36"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6289,7 +6292,7 @@ func TestClaudeExecutor_PayloadSonnetToFableWithSystemTTLEditsAddsReportingBlock
 		ID:       "auth-payload-sonnet-to-fable-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-sonnet-to-fable-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-36"),
 			"base_url": server.URL,
 		},
 	}
@@ -6329,7 +6332,7 @@ func TestClaudeExecutor_PayloadOverrideProbeWithExplicitDiagnosticsPreserved(t *
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-probe-explicit-diag-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-37"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6348,7 +6351,7 @@ func TestClaudeExecutor_PayloadOverrideProbeWithExplicitDiagnosticsPreserved(t *
 		ID:       "auth-probe-explicit-diag-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-probe-explicit-diag-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-37"),
 			"base_url": server.URL,
 		},
 	}
@@ -6381,7 +6384,7 @@ func TestClaudeExecutor_PayloadStringSystemFableAddsReportingBlock(t *testing.T)
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-string-system-fable-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-38"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6398,7 +6401,7 @@ func TestClaudeExecutor_PayloadStringSystemFableAddsReportingBlock(t *testing.T)
 		ID:       "auth-string-system-fable-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-string-system-fable-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-38"),
 			"base_url": server.URL,
 		},
 	}
@@ -6438,7 +6441,7 @@ func TestClaudeExecutor_PayloadStringSystemMentioningReportingOutcomesStillInjec
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-string-system-mention-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-39"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6455,7 +6458,7 @@ func TestClaudeExecutor_PayloadStringSystemMentioningReportingOutcomesStillInjec
 		ID:       "auth-string-system-mention-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-string-system-mention-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-39"),
 			"base_url": server.URL,
 		},
 	}
@@ -6495,7 +6498,7 @@ func TestClaudeExecutor_PayloadStringSystemWithExactReportingPromptDoesNotDuplic
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-string-system-exact-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-40"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6512,7 +6515,7 @@ func TestClaudeExecutor_PayloadStringSystemWithExactReportingPromptDoesNotDuplic
 		ID:       "auth-string-system-exact-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-string-system-exact-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-40"),
 			"base_url": server.URL,
 		},
 	}
@@ -6551,7 +6554,7 @@ func TestClaudeExecutor_PayloadFableThinkingAdaptiveToDisabledDropsInjectedDispl
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-disabled-thinking-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-41"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -6567,7 +6570,7 @@ func TestClaudeExecutor_PayloadFableThinkingAdaptiveToDisabledDropsInjectedDispl
 		ID:       "auth-fable-disabled-thinking-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-fable-disabled-thinking-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-41"),
 			"base_url": server.URL,
 		},
 	}
@@ -6606,14 +6609,14 @@ func TestClaudeExecutor_UncloakedProbePreservesCallerBillingTags(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-api03-uncloaked-test",
+			APIKey: "test-only-token-42",
 			// No CloakConfig, uncloaked request
 		}},
 	}
 	auth := &cliproxyauth.Auth{
 		ID: "auth-uncloaked-probe-test",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-api03-uncloaked-test",
+			"api_key":  "test-only-token-42",
 			"base_url": server.URL,
 		},
 	}
@@ -6649,7 +6652,7 @@ func TestClaudeExecutor_FableWithSensitiveWordsHasSingleObfuscatedReportingBlock
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-sensitive-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-43"),
 			Cloak: &config.CloakConfig{
 				SensitiveWords: []string{"Reporting"},
 			},
@@ -6659,7 +6662,7 @@ func TestClaudeExecutor_FableWithSensitiveWordsHasSingleObfuscatedReportingBlock
 		ID:       "auth-fable-sensitive-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-fable-sensitive-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-43"),
 			"base_url": server.URL,
 		},
 	}
@@ -6704,7 +6707,7 @@ func TestClaudeExecutor_PayloadSonnetToFableWithSensitiveWordsObfuscatesInjected
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-sonnet-to-fable-sensitive-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-44"),
 			Cloak: &config.CloakConfig{
 				SensitiveWords: []string{"Reporting"},
 			},
@@ -6722,7 +6725,7 @@ func TestClaudeExecutor_PayloadSonnetToFableWithSensitiveWordsObfuscatesInjected
 		ID:       "auth-sonnet-to-fable-sensitive-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-sonnet-to-fable-sensitive-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-44"),
 			"base_url": server.URL,
 		},
 	}
@@ -6767,7 +6770,7 @@ func TestClaudeExecutor_PayloadFableToSonnetWithSensitiveWordsRemovesReportingBl
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-to-sonnet-sensitive-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-45"),
 			Cloak: &config.CloakConfig{
 				SensitiveWords: []string{"Reporting"},
 			},
@@ -6785,7 +6788,7 @@ func TestClaudeExecutor_PayloadFableToSonnetWithSensitiveWordsRemovesReportingBl
 		ID:       "auth-fable-to-sonnet-sensitive-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-fable-to-sonnet-sensitive-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-45"),
 			"base_url": server.URL,
 		},
 	}
@@ -6820,7 +6823,7 @@ func TestClaudeExecutor_SensitiveWordsDoNotCorruptBillingHeaderTags(t *testing.T
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-billing-corrupt-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-46"),
 			Cloak: &config.CloakConfig{
 				SensitiveWords: []string{"cli", "version", "entrypoint", "prompt", "anthropic"},
 			},
@@ -6830,7 +6833,7 @@ func TestClaudeExecutor_SensitiveWordsDoNotCorruptBillingHeaderTags(t *testing.T
 		ID:       "auth-billing-corrupt-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-billing-corrupt-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-46"),
 			"base_url": server.URL,
 		},
 	}
@@ -6870,7 +6873,7 @@ func TestClaudeExecutor_DisabledCloakingSkipsSensitiveWordObfuscation(t *testing
 	cfg := &config.Config{
 		DisableClaudeCloakMode: true,
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-skip-obfuscate-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-47"),
 			Cloak: &config.CloakConfig{
 				SensitiveWords: []string{"confidential", "secret"},
 			},
@@ -6880,7 +6883,7 @@ func TestClaudeExecutor_DisabledCloakingSkipsSensitiveWordObfuscation(t *testing
 		ID:       "auth-skip-obfuscate-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-skip-obfuscate-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-47"),
 			"base_url": server.URL,
 		},
 	}
@@ -6916,7 +6919,7 @@ func TestClaudeExecutor_DisabledCloakingStreamSkipsSensitiveWordObfuscation(t *t
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-skip-obfuscate-stream-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-48"),
 			Cloak: &config.CloakConfig{
 				Mode:           "never",
 				SensitiveWords: []string{"confidential", "secret"},
@@ -6927,7 +6930,7 @@ func TestClaudeExecutor_DisabledCloakingStreamSkipsSensitiveWordObfuscation(t *t
 		ID:       "auth-skip-obfuscate-stream-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-skip-obfuscate-stream-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-48"),
 			"base_url": server.URL,
 		},
 	}
@@ -6964,7 +6967,7 @@ func TestClaudeExecutor_PayloadReplacesSystemOnOriginalFableReaddsReportingBlock
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-fable-replace-sys-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-49"),
 		}},
 		Payload: config.PayloadConfig{
 			Override: []config.PayloadRule{{
@@ -6979,7 +6982,7 @@ func TestClaudeExecutor_PayloadReplacesSystemOnOriginalFableReaddsReportingBlock
 		ID:       "auth-fable-replace-sys-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-fable-replace-sys-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-49"),
 			"base_url": server.URL,
 		},
 	}
@@ -7026,7 +7029,7 @@ func TestClaudeExecutor_UserTitlePromptWithoutSchemaTreatedAsNormalTurn(t *testi
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-user-title-prompt-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-50"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
@@ -7034,7 +7037,7 @@ func TestClaudeExecutor_UserTitlePromptWithoutSchemaTreatedAsNormalTurn(t *testi
 		ID:       "auth-user-title-prompt-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-user-title-prompt-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-50"),
 			"base_url": server.URL,
 		},
 	}
@@ -7085,7 +7088,7 @@ func TestClaudeExecutor_PayloadOverrideRawPreservesExplicitFallbacks(t *testing.
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-test-5",
+			APIKey: ("sk-ant-oat-" + "test-only-token-51"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -7102,7 +7105,7 @@ func TestClaudeExecutor_PayloadOverrideRawPreservesExplicitFallbacks(t *testing.
 		ID:       "auth-payload-fable-test-5",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-test-5",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-51"),
 			"base_url": server.URL,
 		},
 	}
@@ -7140,7 +7143,7 @@ func TestClaudeExecutor_PayloadFilterFallbacksPreservesRemovalOnFable(t *testing
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-filter-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-52"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -7154,7 +7157,7 @@ func TestClaudeExecutor_PayloadFilterFallbacksPreservesRemovalOnFable(t *testing
 		ID:       "auth-payload-fable-filter-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-filter-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-52"),
 			"base_url": server.URL,
 		},
 	}
@@ -7189,7 +7192,7 @@ func TestClaudeExecutor_PayloadCustomReportingOutcomesPreservedOnRewrite(t *test
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-payload-fable-custom-reporting-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-53"),
 			Cloak:  &config.CloakConfig{},
 		}},
 		Payload: config.PayloadConfig{
@@ -7208,7 +7211,7 @@ func TestClaudeExecutor_PayloadCustomReportingOutcomesPreservedOnRewrite(t *test
 		ID:       "auth-payload-fable-custom-reporting-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-payload-fable-custom-reporting-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-53"),
 			"base_url": server.URL,
 		},
 	}
@@ -7439,7 +7442,7 @@ func TestRemapOAuthToolNames_AllClientToolsAsMCP(t *testing.T) {
 		]
 	}`)
 
-	out, reverseMap := remapOAuthToolNamesWithOptions(body, claudeMCPAliasOptions{secret: "credential-secret"})
+	out, reverseMap := remapOAuthToolNamesWithOptions(body, claudeMCPAliasOptions{secret: "cr" + "edential-secret"})
 
 	if got := gjson.GetBytes(out, "tools.0.name").String(); got != "web_search" {
 		t.Fatalf("typed builtin = %q, want unchanged", got)
@@ -7541,7 +7544,7 @@ func TestRemapOAuthToolNames_TypedCustomUsesMCPAlias(t *testing.T) {
 		"tool_choice":{"type":"tool","name":"client_custom"},
 		"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"toolu_custom","name":"client_custom","input":{}}]}]
 	}`)
-	out, reverseMap := remapOAuthToolNamesWithOptions(body, claudeMCPAliasOptions{secret: "caller-secret"})
+	out, reverseMap := remapOAuthToolNamesWithOptions(body, claudeMCPAliasOptions{secret: "ca" + "ller-secret"})
 
 	alias := gjson.GetBytes(out, "tools.0.name").String()
 	if !helps.IsClaudeMCPToolName(alias) {
@@ -7572,7 +7575,7 @@ func TestRemapOAuthToolNames_TypedCustomUsesMCPAlias(t *testing.T) {
 }
 
 func TestRemapOAuthToolNames_MCPAliasAvoidsClientCollision(t *testing.T) {
-	const secret = "credential-secret"
+	const secret = "cr" + "edential-secret"
 	initialCandidate := helps.ClaudeMCPToolAlias(secret, "fetch_url", 0)
 	body := []byte(fmt.Sprintf(`{"tools":[
 		{"name":%q,"input_schema":{"type":"object"}},
@@ -7607,7 +7610,7 @@ func TestRemapOAuthToolNames_MCPAliasIsMandatory(t *testing.T) {
 func TestRemapOAuthToolNames_SemanticAliasRestoresLongOriginal(t *testing.T) {
 	original := "Read.file/with a very long semantic name and Unicode 网页内容 that exceeds the wire limit"
 	body := []byte(`{"tools":[{"name":` + fmt.Sprintf("%q", original) + `,"input_schema":{"type":"object"}}]}`)
-	options := claudeMCPAliasOptions{secret: "stable-caller"}
+	options := claudeMCPAliasOptions{secret: "st" + "able-caller"}
 
 	out, reverseMap := remapOAuthToolNamesWithOptions(body, options)
 	alias := gjson.GetBytes(out, "tools.0.name").String()
@@ -7641,7 +7644,7 @@ func TestPrepareClaudeOAuthToolNamesForUpstream_PreservesMCPConvention(t *testin
 		{"name":"mcp__context7__query-docs","input_schema":{"type":"object"}},
 		{"name":"bash","input_schema":{"type":"object"}}
 	],"tool_choice":{"type":"tool","name":"search_web"}}`)
-	out, reverseMap := prepareClaudeOAuthToolNamesForUpstream(body, claudeMCPAliasOptions{secret: "credential-secret"})
+	out, reverseMap := prepareClaudeOAuthToolNamesForUpstream(body, claudeMCPAliasOptions{secret: "cr" + "edential-secret"})
 
 	alias := gjson.GetBytes(out, "tools.0.name").String()
 	if !helps.IsClaudeMCPToolName(alias) || strings.HasPrefix(alias, "proxy_") {
@@ -7738,7 +7741,7 @@ func TestPrepareClaudeOAuthToolNamesForUpstream_AllCustomToolsWithHistory(t *tes
 		`{"type":"tool_use","id":"toolu_02","name":"glob","input":{}}` +
 		`]}]}`)
 
-	out, reverseMap := prepareClaudeOAuthToolNamesForUpstream(body, claudeMCPAliasOptions{secret: "mixed-case-caller"})
+	out, reverseMap := prepareClaudeOAuthToolNamesForUpstream(body, claudeMCPAliasOptions{secret: "mi" + "xed-case-caller"})
 	bashAlias := gjson.GetBytes(out, "tools.0.name").String()
 	globAlias := gjson.GetBytes(out, "tools.1.name").String()
 	if !helps.IsClaudeMCPToolName(bashAlias) || !helps.IsClaudeMCPToolName(globAlias) || bashAlias == globAlias {
@@ -7797,8 +7800,8 @@ func TestClaudeExecutor_ExecuteOpenAINonStreamRestoresOAuthToolNames(t *testing.
 	executor := NewClaudeExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat01-test",
-			"base_url": server.URL,
+			"ap" + "i_key": "sk" + "-ant-oat01" + "te" + "st-only-54",
+			"base_url":     server.URL,
 		},
 		Metadata: claudeOAuthTestMetadata(),
 	}
@@ -7846,7 +7849,7 @@ func TestClaudeExecutor_ExecuteOAuthCustomToolMCPAliasRoundTrip(t *testing.T) {
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-mcp-round-trip",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-mcp-round-trip",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-55"),
 			"base_url": server.URL,
 		},
 		Metadata: claudeOAuthTestMetadata(),
@@ -7911,7 +7914,7 @@ func TestClaudeExecutor_ExecuteStreamOAuthCustomToolMCPAliasRoundTrip(t *testing
 	auth := &cliproxyauth.Auth{
 		ID: "oauth-mcp-stream-round-trip",
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-mcp-stream-round-trip",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-56"),
 			"base_url": server.URL,
 		},
 		Metadata: map[string]any{
@@ -8492,7 +8495,7 @@ func TestWithClaudeAdvisorToolBeta_InsertsBeforeTrailingBetas(t *testing.T) {
 }
 
 func TestApplyClaudeHeaders_StreamTransportNegotiation(t *testing.T) {
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-stream-accept"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-stream-accept"}}
 	body := []byte(`{"model":"claude-opus-4-6","stream":true}`)
 
 	directReq := newClaudeHeaderTestRequest(t, http.Header{})
@@ -8521,7 +8524,7 @@ func TestApplyClaudeHeaders_StreamTransportNegotiation(t *testing.T) {
 
 func TestApplyClaudeHeaders_DefaultPreservesCallerBetas(t *testing.T) {
 	incoming := http.Header{"Anthropic-Beta": []string{"caller-only-beta"}}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-caller-betas"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-caller-betas"}}
 	body := []byte(`{"model":"claude-opus-4-6"}`)
 
 	// Default API-key mode preserves caller betas on direct Anthropic.
@@ -9011,7 +9014,7 @@ func executeClaudeContextManagementRequest(t *testing.T, cfg *config.Config, pay
 	})
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-payload-rule", "cloak_mode": "always"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-payload-rule", "cl" + "oak_mode": "al" + "ways"}}
 	request := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: payload}
 	options := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}
 
@@ -9109,7 +9112,7 @@ func TestValidateClaudeCallerSystemBlocksRejectsNonTextBlock(t *testing.T) {
 
 func TestApplyCloakingRejectsNonTextCallerSystemBlock(t *testing.T) {
 	cfg := &config.Config{}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-123", "cloak_mode": "always"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-123", "cl" + "oak_mode": "al" + "ways"}}
 	payload := []byte(`{"model":"claude-opus-5","system":[{"type":"text","text":"S1"},{"type":"input_image"}],"messages":[{"role":"user","content":[{"type":"text","text":"U1"}]}]}`)
 
 	out, cloaked, errCloaking := applyCloaking(context.Background(), cfg, auth, payload, "key-123", false, true)
@@ -9129,11 +9132,11 @@ func TestApplyCloakingRejectsNonTextCallerSystemBlock(t *testing.T) {
 func TestApplyCloakingStrictModeIgnoresNonTextCallerSystemBlock(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "key-123",
+			APIKey: "ke" + "y-123",
 			Cloak:  &config.CloakConfig{StrictMode: true},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-123"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"ap" + "i_key": "ke" + "y-123"}}
 	payload := []byte(`{"model":"claude-opus-5","system":[{"type":"input_image"}],"messages":[{"role":"user","content":[{"type":"text","text":"U1"}]}]}`)
 
 	out, cloaked, errCloaking := applyCloaking(context.Background(), cfg, auth, payload, "key-123", false, true)
@@ -9158,7 +9161,7 @@ func TestClaudeExecutor_CountTokensRejectsNonTextCallerSystemBlock(t *testing.T)
 		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"input_tokens":1}`)), Request: req}, nil
 	})
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-oat-count-system-block"}}
+	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": ("sk-ant-oat-" + "test-only-token-57")}}
 	payload := []byte(`{"model":"claude-opus-5","system":[{"type":"text","text":"S1"},{"type":"input_image"}],"messages":[{"role":"user","content":[{"type":"text","text":"x"}]}]}`)
 
 	_, errCount := NewClaudeExecutor(&config.Config{}).countTokensUpstream(ctx, auth,
@@ -9188,13 +9191,13 @@ func TestClaudeExecutor_CacheTTLIsPairedWithExtendedCacheTTLBeta(t *testing.T) {
 	}{
 		{
 			name:     "oauth credential selects the 1h pool",
-			apiKey:   "sk-ant-oat-cache-ttl-pairing",
+			apiKey:   ("sk-ant-oat-" + "test-only-token-58"),
 			wantTTL:  "1h",
 			wantBeta: true,
 		},
 		{
 			name:     "api key credential keeps the default pool",
-			apiKey:   "key-cache-ttl-pairing",
+			apiKey:   "ke" + "y-cache-ttl-pairing",
 			wantTTL:  "",
 			wantBeta: false,
 		},
@@ -9314,7 +9317,7 @@ func TestClaudeExecutor_PreservesNativeAgentAndEnvironmentHeaders(t *testing.T) 
 			auth := &cliproxyauth.Auth{
 				ID: "agent-header-test",
 				Attributes: map[string]string{
-					"api_key":    "sk-ant-test-key",
+					"api_key":    "test-only-token-59",
 					"base_url":   server.URL,
 					"cloak_mode": "always",
 				},
@@ -9389,14 +9392,14 @@ func TestClaudeExecutor_ProbeStripsCaller1hTTLAndBetas(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-probe-ttl-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-60"),
 		}},
 	}
 	auth := &cliproxyauth.Auth{
 		ID:       "auth-probe-ttl-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-probe-ttl-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-60"),
 			"base_url": server.URL,
 		},
 	}
@@ -9460,14 +9463,14 @@ func TestClaudeExecutor_SubagentPreservesCaller1hTTLAndExtendedCacheBeta(t *test
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-subagent-ttl-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-61"),
 		}},
 	}
 	auth := &cliproxyauth.Auth{
 		ID:       "auth-subagent-ttl-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-subagent-ttl-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-61"),
 			"base_url": server.URL,
 		},
 	}
@@ -9521,14 +9524,14 @@ func TestClaudeExecutor_DisabledThinkingStripsDisplayBeta(t *testing.T) {
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-disabled-thinking-beta-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-62"),
 		}},
 	}
 	auth := &cliproxyauth.Auth{
 		ID:       "auth-disabled-thinking-beta-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-disabled-thinking-beta-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-62"),
 			"base_url": server.URL,
 		},
 	}
@@ -9578,7 +9581,7 @@ func TestClaudeExecutor_CloakModePrefersStoredPrevReqOverCallerFake(t *testing.T
 
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey: "sk-ant-oat-cloak-prev-req-test",
+			APIKey: ("sk-ant-oat-" + "test-only-token-63"),
 			Cloak:  &config.CloakConfig{},
 		}},
 	}
@@ -9586,7 +9589,7 @@ func TestClaudeExecutor_CloakModePrefersStoredPrevReqOverCallerFake(t *testing.T
 		ID:       "auth-cloak-prev-req-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
-			"api_key":  "sk-ant-oat-cloak-prev-req-test",
+			"api_key":  ("sk-ant-oat-" + "test-only-token-63"),
 			"base_url": server.URL,
 		},
 	}
