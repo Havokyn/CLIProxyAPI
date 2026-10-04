@@ -195,7 +195,8 @@ func claudeQuotaWindows(signals map[string]string, observedAt time.Time) []Quota
 			continue
 		}
 		resetAt := parseQuotaTimestamp(normalized[prefix+name+"-reset"])
-		if resetAt.IsZero() {
+		inactive := name == "5h" && utilization == 0 && normalized[prefix+name+"-status"] == "inactive" && normalized[prefix+name+"-reset"] == ""
+		if resetAt.IsZero() && !inactive {
 			continue
 		}
 		identity := name
@@ -213,6 +214,7 @@ func claudeQuotaWindows(signals map[string]string, observedAt time.Time) []Quota
 			Reserve:          quotaWindowNameIsReserve(name),
 			ManualReset:      quotaWindowNameIsManual(name),
 			Exhausted:        utilization >= 1 || status == "rejected",
+			Inactive:         inactive,
 		})
 	}
 	return windows

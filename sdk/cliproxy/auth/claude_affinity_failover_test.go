@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -192,6 +193,59 @@ func TestClaudeDistinctModelWindowStillLimitsCredential(t *testing.T) {
 
 func claudeAffinityOptions(session string) cliproxyexecutor.Options {
 	return cliproxyexecutor.Options{Headers: http.Header{"X-Session-ID": []string{session}}}
+}
+
+func TestClaudeInactiveShortWindowSupersedesOldModelObservation(t *testing.T) {
+	for _, remaining := range []float64{100, 0} {
+		t.Run(fmt.Sprint(remaining), func(t *testing.T) {
+			selector := resetAwareFixtureSelector(&RoundRobinSelector{})
+			selector.config.StaleTelemetryPolicy = "exclude"
+			inactive := resetAwareFixtureWindow("5h", 100, time.Time{}, 5*time.Hour)
+			inactive.Inactive = true
+			a := resetAwareFixtureAuth("inactive", "claude", resetAwareFixtureWindow("weekly", remaining, resetAwareFixtureNow.Add(48*time.Hour), 7*24*time.Hour), inactive)
+			old := resetAwareFixtureWindow("5h", 99, resetAwareFixtureNow.Add(-time.Hour), 5*time.Hour)
+			old.ObservedAt = resetAwareFixtureNow.Add(-2 * time.Hour)
+			a.ModelStates = map[string]*ModelState{claudeAffinityQuotaModel: {Quota: QuotaState{ObservedAt: old.ObservedAt, Windows: []QuotaWindow{old}}}}
+			view := selector.Explain("claude", claudeAffinityQuotaModel, []*Auth{a}, resetAwareFixtureNow)[0]
+			if !view.TelemetryFresh || view.Eligible != (remaining > 0) || view.Selected != (remaining > 0) {
+				t.Fatalf("candidate = %+v", view)
+			}
+			// Current inactive evidence must age out, just like active telemetry.
+			view = selector.Explain("claude", claudeAffinityQuotaModel, []*Auth{a}, resetAwareFixtureNow.Add(2*time.Hour))[0]
+			if view.TelemetryFresh || view.Selected {
+				t.Fatalf("aged evidence accepted: %+v", view)
+			}
+		})
+	}
+}
+
+func TestClaudeInactiveShortWindowPreservesIndependentLimits(t *testing.T) {
+	for _, kind := range []string{"model-specific", "other-provider", "missing-reset", "newer-active"} {
+		t.Run(kind, func(t *testing.T) {
+			selector := resetAwareFixtureSelector(&RoundRobinSelector{})
+			selector.config.StaleTelemetryPolicy = "exclude"
+			inactive := resetAwareFixtureWindow("5h", 100, time.Time{}, 5*time.Hour)
+			inactive.Inactive = true
+			a := resetAwareFixtureAuth("bounded", "claude", resetAwareFixtureWindow("weekly", 100, resetAwareFixtureNow.Add(48*time.Hour), 7*24*time.Hour), inactive)
+			old := resetAwareFixtureWindow("5h", 0, resetAwareFixtureNow.Add(time.Hour), 5*time.Hour)
+			old.ObservedAt = resetAwareFixtureNow.Add(-time.Minute)
+			switch kind {
+			case "model-specific":
+				old.Model = claudeAffinityQuotaModel
+			case "other-provider":
+				a.Provider = "codex"
+			case "missing-reset":
+				a.Quota.Windows[1].Inactive = false
+			case "newer-active":
+				old.ObservedAt = resetAwareFixtureNow.Add(time.Second)
+			}
+			a.ModelStates = map[string]*ModelState{claudeAffinityQuotaModel: {Quota: QuotaState{ObservedAt: old.ObservedAt, Windows: []QuotaWindow{old}}}}
+			view := selector.Explain(a.Provider, claudeAffinityQuotaModel, []*Auth{a}, resetAwareFixtureNow)[0]
+			if view.Selected || (view.TelemetryFresh && view.Eligible) {
+				t.Fatalf("independent limit bypassed: %+v", view)
+			}
+		})
+	}
 }
 
 func TestClaudeStaleExhaustionCannotEnterTelemetryFallback(t *testing.T) {

@@ -637,6 +637,9 @@ func (s *ResetAwareSelector) assessLocked(provider, model string, auth *Auth, no
 			markStale()
 			return assessment
 		}
+		if inactiveClaudeShortWindow(window) {
+			continue
+		}
 		if window.ResetAt.IsZero() {
 			assessment.telemetryState = "missing-reset"
 			return assessment
@@ -651,6 +654,9 @@ func (s *ResetAwareSelector) assessLocked(provider, model string, auth *Auth, no
 	normalWindows := make([]QuotaWindow, 0, len(applicable))
 	reserveWindows := make([]QuotaWindow, 0, len(applicable))
 	for _, window := range applicable {
+		if inactiveClaudeShortWindow(window) {
+			continue
+		}
 		if window.Exhausted || window.RemainingPercent <= 0 {
 			if !window.Reserve {
 				normalWindows = append(normalWindows, window)
@@ -726,7 +732,7 @@ func exhaustedQuotaWindowReason(windows []QuotaWindow, now time.Time, reservePol
 	normalReason, reserveReason := "", ""
 	hasReserve, hasNormal, reserveUsable := false, false, true
 	for _, window := range windows {
-		if window.ManualReset {
+		if window.ManualReset || inactiveClaudeShortWindow(window) {
 			continue
 		}
 		if window.Reserve {
@@ -757,6 +763,10 @@ func exhaustedQuotaWindowReason(windows []QuotaWindow, now time.Time, reservePol
 		return ""
 	}
 	return normalReason
+}
+
+func inactiveClaudeShortWindow(window QuotaWindow) bool {
+	return window.Inactive && strings.EqualFold(window.Provider, "claude") && window.Name == "5h" && window.Model == "" && !window.Reserve && !window.ManualReset && !window.Exhausted && window.RemainingPercent == 100 && window.ResetAt.IsZero()
 }
 
 func longestQuotaWindow(windows []QuotaWindow, observedAt time.Time) *QuotaWindow {

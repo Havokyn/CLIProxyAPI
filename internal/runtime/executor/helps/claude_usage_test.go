@@ -61,3 +61,36 @@ func TestParseClaudeUsageHeadersRejectsTrailingJSON(t *testing.T) {
 		t.Fatal("trailing JSON accepted")
 	}
 }
+
+func TestParseClaudeUsageHeadersInactiveFiveHour(t *testing.T) {
+	for _, short := range []string{
+		`{"utilization":0,"resets_at":null}`,
+		`{"utilization":0}`,
+		`{"utilization":1,"resets_at":null}`,
+		`{"utilization":null,"resets_at":null}`,
+		`{"utilization":0,"resets_at":"invalid"}`,
+		`{"utilization":0,"resets_at":null,"status":"rejected"}`,
+	} {
+		t.Run(short, func(t *testing.T) {
+			headers, err := ParseClaudeUsageHeaders([]byte(`{"five_hour":` + short + `,"seven_day":{"utilization":0,"resets_at":"2026-10-06T14:00:00Z"}}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var quota coreauth.QuotaState
+			quota.ObserveResponseHeadersForProvider("claude", headers, time.Date(2026, 10, 4, 2, 32, 0, 0, time.UTC))
+			wantInactive := short == `{"utilization":0,"resets_at":null}`
+			found := false
+			for _, window := range quota.Windows {
+				if window.Name == "5h" {
+					found = true
+					if !window.Inactive || !window.ResetAt.IsZero() || window.RemainingPercent != 100 {
+						t.Fatalf("inactive window = %+v", window)
+					}
+				}
+			}
+			if found != wantInactive {
+				t.Fatalf("inactive=%v, want %v", found, wantInactive)
+			}
+		})
+	}
+}

@@ -193,6 +193,9 @@ type QuotaWindow struct {
 	ManualReset bool `json:"manual_reset,omitempty"`
 	// Exhausted is an explicit provider exhaustion signal.
 	Exhausted bool `json:"exhausted,omitempty"`
+	// Inactive records an explicit zero-use Claude 5h window with a null reset.
+	// It supersedes older shared 5h observations without inventing a reset time.
+	Inactive bool `json:"inactive,omitempty"`
 	// Model limits the window to one model when provider telemetry is model-specific.
 	Model string `json:"model,omitempty"`
 	// Provider limits the window to one provider/channel when necessary.

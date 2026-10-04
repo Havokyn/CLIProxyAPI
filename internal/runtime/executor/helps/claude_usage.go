@@ -42,6 +42,15 @@ func ParseClaudeUsageHeaders(payload []byte) (http.Header, error) {
 			continue
 		}
 		utilization, okUtil := claudeUsageNumber(window["utilization"])
+		status, okStatus := claudeUsageString(window["status"])
+		// Zero use with an explicitly null reset means no active 5h period.
+		// Preserve this evidence so an old passive 5h window cannot survive it.
+		// Missing fields, positive use and malformed resets remain incomplete.
+		if name == "five_hour" && okUtil && utilization == 0 && bytes.Equal(bytes.TrimSpace(window["resets_at"]), []byte("null")) && (len(window["status"]) == 0 || (okStatus && strings.EqualFold(status, "allowed"))) {
+			headers.Set("Anthropic-Ratelimit-Unified-5h-Utilization", "0")
+			headers.Set("Anthropic-Ratelimit-Unified-5h-Status", "inactive")
+			continue
+		}
 		reset, okReset := claudeUsageReset(window["resets_at"])
 		if !okUtil || !okReset || math.IsNaN(utilization) || math.IsInf(utilization, 0) || utilization < 0 || utilization > 100 || strings.TrimSpace(reset) == "" {
 			continue
@@ -49,7 +58,7 @@ func ParseClaudeUsageHeaders(payload []byte) (http.Header, error) {
 		prefix := "Anthropic-Ratelimit-Unified-" + normalizedName + "-"
 		headers.Set(prefix+"Utilization", strconv.FormatFloat(utilization/100, 'f', -1, 64))
 		headers.Set(prefix+"Reset", reset)
-		if status, ok := claudeUsageString(window["status"]); ok && status != "" {
+		if okStatus && status != "" {
 			headers.Set(prefix+"Status", status)
 		}
 	}
@@ -75,6 +84,9 @@ func claudeUsageReset(raw json.RawMessage) (string, bool) {
 }
 
 func claudeUsageNumber(raw json.RawMessage) (float64, bool) {
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return 0, false
+	}
 	var number json.Number
 	if json.Unmarshal(raw, &number) == nil {
 		value, err := number.Float64()
