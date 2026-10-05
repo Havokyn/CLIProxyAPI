@@ -12,6 +12,8 @@ type Config = internalconfig.Config
 type RoutingConfig = internalconfig.RoutingConfig
 type ResetAwareRoutingConfig = internalconfig.ResetAwareRoutingConfig
 
+type ModelCatalogs = internalconfig.ModelCatalogs
+
 type ClientConfig = internalconfig.ClientConfig
 type CodexClientConfig = internalconfig.CodexClientConfig
 type StreamingConfig = internalconfig.StreamingConfig
