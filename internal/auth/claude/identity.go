@@ -173,6 +173,17 @@ func StoreDeviceIDPool(metadata *map[string]any, deviceIDs []string) {
 	(*metadata)[ClaudeDeviceIDsMetadataKey] = append([]string(nil), deviceIDs...)
 }
 
+// ReadMetadataBool reads a boolean metadata entry under the metadata lock.
+func ReadMetadataBool(metadata *map[string]any, key string) bool {
+	if metadata == nil {
+		return false
+	}
+	claudeDevicePoolMu.Lock()
+	defer claudeDevicePoolMu.Unlock()
+	value, _ := (*metadata)[key].(bool)
+	return value
+}
+
 // ReadMetadataString reads a string-valued metadata entry under the metadata
 // lock, so it cannot observe a map being concurrently written by another path.
 func ReadMetadataString(metadata *map[string]any, key string) string {
