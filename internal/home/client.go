@@ -1959,8 +1959,16 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 		}
 		return c.endConfigSubscriberLifetime(ErrNotConnected)
 	}
+	// ReceiveTimeout does not interrupt an active socket read when ctx is canceled.
+	// Close only this lifetime's subscription so replacement can finish even while
+	// Home keeps sending healthy heartbeats.
+	stopCancellation := context.AfterFunc(ctx, func() { _ = pubsub.Close() })
+	defer stopCancellation()
 
 	if errACK := receiveSubscriptionACKs(ctx, pubsub, receiveTimeout, args[:1]); errACK != nil {
+		if errContext := ctx.Err(); errContext != nil {
+			return c.endConfigSubscriberLifetimeWithSubscription(errContext, pubsub, "cancellation")
+		}
 		if ctx.Err() == nil {
 			c.markReconnectFailure("subscribe")
 		}
@@ -1984,9 +1992,15 @@ func (c *Client) RunConfigSubscriberLifetime(ctx context.Context, onConfig func(
 	}
 
 	for {
+		if errContext := ctx.Err(); errContext != nil {
+			return c.endConfigSubscriberLifetimeWithSubscription(errContext, pubsub, "cancellation")
+		}
 		_, receiveTimeout = c.subscriptionParameters()
 		event, errReceive := pubsub.ReceiveTimeout(ctx, receiveTimeout)
 		if errReceive != nil {
+			if errContext := ctx.Err(); errContext != nil {
+				return c.endConfigSubscriberLifetimeWithSubscription(errContext, pubsub, "cancellation")
+			}
 			if ctx.Err() == nil {
 				if c.heartbeatOK.Load() {
 					c.markMembershipTakeoverEligible()

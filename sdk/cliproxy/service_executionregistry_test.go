@@ -248,6 +248,7 @@ func TestServiceReplacementWaitsForPublisherExitAndPinsACKedLifetimeDependencies
 	allowSecondConfig := make(chan struct{})
 	stop := make(chan struct{})
 	serverDone := make(chan struct{})
+	var handlers sync.WaitGroup
 	go func() {
 		defer close(serverDone)
 		for {
@@ -255,13 +256,16 @@ func TestServiceReplacementWaitsForPublisherExitAndPinsACKedLifetimeDependencies
 			if errAccept != nil {
 				return
 			}
-			go servePublisherReplacementConnection(conn, &configRequests, frames, firstPublisherDoneForServer, secondConfigResult, allowSecondConfig, stop)
+			startRegistryTestConnection(conn, stop, &handlers, func(conn net.Conn) {
+				servePublisherReplacementConnection(conn, &configRequests, frames, firstPublisherDoneForServer, secondConfigResult, allowSecondConfig, stop)
+			})
 		}
 	}()
 	t.Cleanup(func() {
 		close(stop)
 		_ = listener.Close()
 		<-serverDone
+		handlers.Wait()
 		home.ClearCurrent()
 	})
 
@@ -737,6 +741,8 @@ func TestServiceInitialOverlayStagesPluginWritesUntilReady(t *testing.T) {
 	allowAck := make(chan struct{})
 	stop := make(chan struct{})
 	serverDone := make(chan struct{})
+	var handlers sync.WaitGroup
+	var signals initialOverlayPluginSignals
 	go func() {
 		defer close(serverDone)
 		for {
@@ -744,13 +750,16 @@ func TestServiceInitialOverlayStagesPluginWritesUntilReady(t *testing.T) {
 			if errAccept != nil {
 				return
 			}
-			go serveInitialOverlayPluginConnection(conn, pluginSync, pluginStatus, pluginTasks, freshCommandProbe, allowAck, stop)
+			startRegistryTestConnection(conn, stop, &handlers, func(conn net.Conn) {
+				serveInitialOverlayPluginConnection(conn, pluginSync, pluginStatus, pluginTasks, freshCommandProbe, allowAck, stop, &signals)
+			})
 		}
 	}()
 	t.Cleanup(func() {
 		close(stop)
 		_ = listener.Close()
 		<-serverDone
+		handlers.Wait()
 		home.ClearCurrent()
 	})
 
@@ -2312,12 +2321,8 @@ func servePublisherReplacementConnection(conn net.Conn, configRequests *atomic.I
 			if _, errWrite := io.WriteString(conn, "*3\r\n$9\r\nsubscribe\r\n$6\r\nconfig\r\n:1\r\n"); errWrite != nil {
 				return
 			}
-			select {
-			case <-stop:
-				return
-			case <-time.After(time.Second):
-				return
-			}
+			serveRegistryTestHeartbeats(conn, stop)
+			return
 		case len(args) >= 3 && strings.EqualFold(args[0], "LPUSH") && args[1] == "in-flight-snapshot":
 			var frame home.InFlightSnapshotFrame
 			if errUnmarshal := json.Unmarshal([]byte(args[2]), &frame); errUnmarshal != nil {
@@ -2514,7 +2519,48 @@ func serveStalePreACKPluginConnection(conn net.Conn, subscriptions *atomic.Int32
 	}
 }
 
-func serveInitialOverlayPluginConnection(conn net.Conn, pluginSync chan struct{}, pluginStatus chan struct{}, pluginTasks chan struct{}, freshCommandProbe chan struct{}, allowAck chan struct{}, stop chan struct{}) {
+type initialOverlayPluginSignals struct {
+	pluginSync, pluginTasks, freshCommandProbe sync.Once
+}
+
+// Each accepted connection belongs to the fixture and must finish before cleanup.
+func startRegistryTestConnection(conn net.Conn, stop <-chan struct{}, handlers *sync.WaitGroup, serve func(net.Conn)) {
+	handlers.Add(1)
+	go func() {
+		defer handlers.Done()
+		done := make(chan struct{})
+		closerDone := make(chan struct{})
+		go func() {
+			defer close(closerDone)
+			select {
+			case <-stop:
+				_ = conn.Close()
+			case <-done:
+			}
+		}()
+		serve(conn)
+		close(done)
+		<-closerDone
+	}()
+}
+
+// Normal-lifetime fixtures must satisfy the heartbeat contract they advertise.
+func serveRegistryTestHeartbeats(conn net.Conn, stop <-chan struct{}) {
+	ticker := time.NewTicker(25 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if _, errWrite := io.WriteString(conn, "*2\r\n$4\r\npong\r\n$0\r\n\r\n"); errWrite != nil {
+				return
+			}
+		}
+	}
+}
+
+func serveInitialOverlayPluginConnection(conn net.Conn, pluginSync chan struct{}, pluginStatus chan struct{}, pluginTasks chan struct{}, freshCommandProbe chan struct{}, allowAck chan struct{}, stop chan struct{}, signals *initialOverlayPluginSignals) {
 	defer func() { _ = conn.Close() }()
 	reader := bufio.NewReader(conn)
 	for {
@@ -2536,7 +2582,7 @@ func serveInitialOverlayPluginConnection(conn net.Conn, pluginSync chan struct{}
 			if home.Current() != nil {
 				return
 			}
-			close(pluginSync)
+			signals.pluginSync.Do(func() { close(pluginSync) })
 			payload := fmt.Sprintf(`{"schema_version":1,"expires_at":%q,"items":[]}`, time.Now().Add(time.Minute).UTC().Format(time.RFC3339Nano))
 			if _, errWrite := io.WriteString(conn, fmt.Sprintf("$%d\r\n%s\r\n", len(payload), payload)); errWrite != nil {
 				return
@@ -2547,18 +2593,22 @@ func serveInitialOverlayPluginConnection(conn net.Conn, pluginSync chan struct{}
 			default:
 				return
 			}
-			pluginStatus <- struct{}{}
+			select {
+			case pluginStatus <- struct{}{}:
+			case <-stop:
+				return
+			}
 			if _, errWrite := io.WriteString(conn, ":1\r\n"); errWrite != nil {
 				return
 			}
 		case len(args) >= 2 && strings.EqualFold(args[0], "GET") && args[1] == "plugin-tasks":
-			close(pluginTasks)
+			signals.pluginTasks.Do(func() { close(pluginTasks) })
 			payload := `[{"id":1,"operation":"delete","plugin_id":"plugin-a"}]`
 			if _, errWrite := io.WriteString(conn, fmt.Sprintf("$%d\r\n%s\r\n", len(payload), payload)); errWrite != nil {
 				return
 			}
 		case len(args) > 0 && strings.EqualFold(args[0], "PING"):
-			close(freshCommandProbe)
+			signals.freshCommandProbe.Do(func() { close(freshCommandProbe) })
 			if _, errWrite := io.WriteString(conn, "+PONG\r\n"); errWrite != nil {
 				return
 			}
@@ -2571,7 +2621,7 @@ func serveInitialOverlayPluginConnection(conn net.Conn, pluginSync chan struct{}
 			if _, errWrite := io.WriteString(conn, "*3\r\n$9\r\nsubscribe\r\n$6\r\nconfig\r\n:1\r\n"); errWrite != nil {
 				return
 			}
-			<-stop
+			serveRegistryTestHeartbeats(conn, stop)
 			return
 		default:
 			if _, errWrite := io.WriteString(conn, "+OK\r\n"); errWrite != nil {
