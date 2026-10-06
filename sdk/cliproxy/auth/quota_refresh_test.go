@@ -247,3 +247,45 @@ func TestQuotaObservationPreservesCooldownAndNewerTelemetry(t *testing.T) {
 		t.Fatal("stale registration accepted")
 	}
 }
+
+func TestQuotaObservationDuringPersistencePreservesPublishedState(t *testing.T) {
+	for _, operation := range []string{"Update", "MarkResult"} {
+		t.Run(operation, func(t *testing.T) {
+			ctx := context.Background()
+			store := &blockingEnrichingAuthStore{entered: make(chan struct{}), release: make(chan struct{})}
+			manager := NewManager(store, nil, nil)
+			base, err := manager.Register(WithSkipPersist(ctx), &Auth{ID: "quota-save", Provider: "codex", Status: StatusActive, Metadata: map[string]any{"type": "codex"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan error, 1)
+			go func() {
+				if operation == "Update" {
+					_, errUpdate := manager.Update(ctx, base.Clone())
+					done <- errUpdate
+				} else {
+					manager.MarkResult(ctx, Result{AuthID: base.ID, Provider: base.Provider, Success: true})
+					done <- nil
+				}
+			}()
+			<-store.entered
+			observation := QuotaState{ObservedAt: resetAwareFixtureNow, Windows: []QuotaWindow{resetAwareFixtureWindow("weekly", 27, resetAwareFixtureNow.Add(time.Hour), 7*24*time.Hour)}}
+			_, errObservation := manager.RecordQuotaObservation(base, observation)
+			close(store.release)
+			errSave := <-done
+			if errObservation != nil || errSave != nil {
+				t.Fatalf("observation=%v persistence=%v", errObservation, errSave)
+			}
+			got, _ := manager.GetByID(base.ID)
+			if len(got.Quota.Windows) != 1 || got.Quota.Windows[0].RemainingPercent != 27 {
+				t.Fatal("persistence lost quota observation")
+			}
+			if got.Attributes[AttributePath] == "" {
+				t.Fatal("quota observation detached persistence enrichment")
+			}
+			if operation == "MarkResult" && got.Success != 1 {
+				t.Fatal("quota observation lost result counter")
+			}
+		})
+	}
+}

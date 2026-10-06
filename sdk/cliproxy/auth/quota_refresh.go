@@ -128,13 +128,13 @@ func (m *Manager) RecordQuotaObservation(base *Auth, observation QuotaState) (*A
 		return nil, fmt.Errorf("quota credential changed during refresh")
 	}
 	if !current.Quota.ObservedAt.After(observation.ObservedAt) {
+		// Keep the published object stable while persistence temporarily releases m.mu.
+		// Update merges these runtime deltas, and persistLocked retains save enrichment.
 		copyObservation := observation.Clone()
-		current = current.Clone()
 		current.Quota.ObservedAt = copyObservation.ObservedAt
 		current.Quota.Signals = copyObservation.Signals
 		current.Quota.Windows = copyObservation.Windows
 		current.Generation++
-		m.auths[base.ID] = current
 	}
 	updated := current.Clone()
 	m.mu.Unlock()

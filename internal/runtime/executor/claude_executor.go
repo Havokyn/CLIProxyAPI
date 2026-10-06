@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
@@ -19,13 +20,16 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// ClaudeExecutor is a stateless executor for Anthropic Claude over the messages API.
+// ClaudeExecutor handles Anthropic Claude over the messages API and keeps bounded
+// in-memory thread alias state for OAuth continuations.
 // If api_key is unavailable on auth, it falls back to legacy via ClientAdapter.
 type ClaudeExecutor struct {
 	cfg                     *config.Config
 	requestLogProvider      string
 	upstreamModelNormalizer func(string) string
 	oauthProfileFetcher     claudeOAuthProfileFetcher
+	oauthToolAliasStoreMu   sync.Mutex
+	oauthToolAliases        *claudeOAuthToolAliasStore
 }
 
 type claudeOAuthCancellationError struct {
